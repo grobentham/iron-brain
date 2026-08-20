@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#07090c" />
+  <title>Iron Brain — MNQ Intelligence Terminal</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar glass-line">
+      <div class="brand-wrap">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div>
+          <div class="brand">IRON BRAIN</div>
+          <div class="brand-sub">MNQ INTELLIGENCE TERMINAL</div>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Primary">
+        <button class="nav-link active">HOME</button>
+        <button class="nav-link">ANALYSIS</button>
+        <button class="nav-link">INTELLIGENCE</button>
+        <button class="nav-link">HISTORY</button>
+        <button class="nav-link">SYSTEM</button>
+      </nav>
+      <div class="top-status">
+        <div class="ticker"><span>MNQ</span><strong id="mnqPrice">29,625.25</strong><em id="mnqMove">+0.12%</em></div>
+        <span class="status-dot live"></span>
+        <span class="market-state">MARKET OPEN</span>
+        <time id="clock">10:31:42 ET</time>
+      </div>
+    </header>
+
+    <main class="command-grid">
+      <aside class="left-rail">
+        <section class="hud-card compact-card" aria-labelledby="feeds-title">
+          <div class="card-kicker">INPUT CHANNELS</div>
+          <h2 id="feeds-title">Live feeds</h2>
+          <div id="feedList" class="feed-list"></div>
+        </section>
+
+        <section class="hud-card activity-card" aria-labelledby="modules-title">
+          <div class="card-kicker">ACTIVE THOUGHT</div>
+          <h2 id="modules-title">Brain modules</h2>
+          <div id="moduleList" class="module-list"></div>
+        </section>
+      </aside>
+
+      <section class="brain-stage" aria-labelledby="brain-heading">
+        <div class="stage-grid" aria-hidden="true"></div>
+        <div class="stage-glow" aria-hidden="true"></div>
+        <div class="stage-label top-left"><span class="micro-dot"></span> V13.5.8 ENGINE MIRROR</div>
+        <div class="stage-label top-right" id="latencyLabel">SIMULATED INPUT · 18 ms</div>
+
+        <div class="brain-wrap" id="brainWrap" data-state="monitoring">
+          <div class="orbit orbit-a"></div>
+          <div class="orbit orbit-b"></div>
+          <div class="orbit orbit-c"></div>
+
+          <svg class="brain-svg" viewBox="0 0 760 600" role="img" aria-labelledby="brain-heading brain-desc">
+            <title id="brain-heading">Iron Brain decision engine visualization</title>
+            <desc id="brain-desc">A stylized neural brain whose pathways brighten and pulse according to the simulated quant engine state.</desc>
+            <defs>
+              <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="5" result="blur" />
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <filter id="coreGlow" x="-100%" y="-100%" width="300%" height="300%">
+                <feGaussianBlur stdDeviation="14" result="blur" />
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <radialGradient id="brainFill" cx="50%" cy="45%" r="65%">
+                <stop offset="0%" stop-color="rgba(255,255,255,.12)"/>
+                <stop offset="68%" stop-color="rgba(210,225,238,.035)"/>
+                <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+              </radialGradient>
+            </defs>
+
+            <g class="brain-shell" filter="url(#softGlow)">
+              <path class="hemisphere left" d="M368 124 C331 84 266 86 232 119 C191 112 150 136 139 176 C104 193 91 237 110 269 C84 298 89 343 121 365 C107 403 132 445 171 454 C184 496 230 519 270 501 C302 523 351 508 371 474 Z"/>
+              <path class="hemisphere right" d="M392 124 C429 84 494 86 528 119 C569 112 610 136 621 176 C656 193 669 237 650 269 C676 298 671 343 639 365 C653 403 628 445 589 454 C576 496 530 519 490 501 C458 523 409 508 389 474 Z"/>
+              <path class="midline" d="M381 112 C369 160 393 187 379 232 C367 272 393 303 380 343 C366 387 391 417 380 481"/>
+            </g>
+
+            <g class="region-halos">
+              <circle class="region-halo technical" cx="256" cy="220" r="77"/>
+              <circle class="region-halo cross" cx="507" cy="225" r="75"/>
+              <circle class="region-halo macro" cx="378" cy="162" r="66"/>
+              <circle class="region-halo news" cx="546" cy="350" r="72"/>
+              <circle class="region-halo fair" cx="235" cy="385" r="70"/>
+              <circle class="region-halo risk" cx="382" cy="423" r="83"/>
+            </g>
+
+            <g class="neural-network" filter="url(#softGlow)">
+              <path class="neural-path p1 technical" d="M157 225 C207 182 248 187 286 216 C323 244 344 255 381 299"/>
+              <path class="neural-path p2 technical" d="M167 318 C214 277 255 292 290 316 C326 342 344 333 381 299"/>
+              <path class="neural-path p3 cross" d="M601 210 C557 185 510 190 473 220 C438 248 420 265 381 299"/>
+              <path class="neural-path p4 cross" d="M610 300 C555 283 518 297 480 318 C440 340 421 330 381 299"/>
+              <path class="neural-path p5 macro" d="M380 129 C358 173 355 209 381 299"/>
+              <path class="neural-path p6 news" d="M589 390 C532 378 479 369 381 299"/>
+              <path class="neural-path p7 fair" d="M184 411 C248 407 310 375 381 299"/>
+              <path class="neural-path p8 risk" d="M381 474 C397 427 408 376 381 299"/>
+              <path class="neural-path p9" d="M231 126 C249 159 280 167 310 158 C344 148 356 170 375 196"/>
+              <path class="neural-path p10" d="M530 128 C507 160 474 166 446 160 C420 154 401 176 387 202"/>
+              <path class="neural-path p11" d="M139 259 C194 254 214 241 245 218"/>
+              <path class="neural-path p12" d="M622 260 C566 255 545 241 516 220"/>
+              <path class="neural-path p13" d="M166 431 C215 430 253 408 281 378"/>
+              <path class="neural-path p14" d="M595 429 C548 431 511 408 479 379"/>
+              <path class="neural-path p15" d="M271 499 C294 455 325 442 382 423"/>
+              <path class="neural-path p16" d="M490 498 C465 456 437 443 382 423"/>
+            </g>
+
+            <g class="nodes" filter="url(#softGlow)">
+              <circle cx="157" cy="225" r="4"/><circle cx="286" cy="216" r="4"/><circle cx="167" cy="318" r="4"/><circle cx="290" cy="316" r="4"/>
+              <circle cx="601" cy="210" r="4"/><circle cx="473" cy="220" r="4"/><circle cx="610" cy="300" r="4"/><circle cx="480" cy="318" r="4"/>
+              <circle cx="380" cy="129" r="4"/><circle cx="589" cy="390" r="4"/><circle cx="184" cy="411" r="4"/><circle cx="381" cy="474" r="4"/>
+              <circle cx="231" cy="126" r="3"/><circle cx="530" cy="128" r="3"/><circle cx="139" cy="259" r="3"/><circle cx="622" cy="260" r="3"/>
+              <circle cx="166" cy="431" r="3"/><circle cx="595" cy="429" r="3"/><circle cx="271" cy="499" r="3"/><circle cx="490" cy="498" r="3"/>
+            </g>
+
+            <g class="decision-core" filter="url(#coreGlow)">
+              <circle class="core-outer" cx="381" cy="299" r="48"/>
+              <circle class="core-mid" cx="381" cy="299" r="28"/>
+              <circle class="core-inner" cx="381" cy="299" r="10"/>
+            </g>
+          </svg>
+
+          <div class="brain-center-label">
+            <span id="brainStateLabel">MONITORING</span>
+            <small id="brainStateDetail">No qualified setup</small>
+          </div>
+        </div>
+
+        <div class="thought-ticker" aria-live="polite">
+          <span class="thought-prefix">THOUGHT STREAM</span>
+          <span id="thoughtText">Monitoring MNQ structure · awaiting qualified setup</span>
+        </div>
+      </section>
+
+      <aside class="right-rail">
+        <section class="hud-card decision-card" id="decisionCard" data-decision="WAIT" aria-labelledby="decision-title">
+          <div class="card-kicker">CURRENT DECISION</div>
+          <div class="decision-main">
+            <div>
+              <h2 id="decision-title">WAIT</h2>
+              <p id="decisionSubtitle">Directional evidence exists, execution not authorized.</p>
+            </div>
+            <div class="decision-glyph" aria-hidden="true"><span></span></div>
+          </div>
+          <div class="metric-grid">
+            <div><span>Confidence</span><strong id="confidence">64%</strong></div>
+            <div><span>Directional bias</span><strong id="directionBias">LONG</strong></div>
+            <div><span>Execution</span><strong id="executionState">DENIED</strong></div>
+            <div><span>Risk state</span><strong id="riskState">SAFE</strong></div>
+          </div>
+        </section>
+
+        <section class="hud-card trade-card" aria-labelledby="trade-title">
+          <div class="card-kicker">PROPOSED STRUCTURE</div>
+          <h2 id="trade-title">Trade plan</h2>
+          <div class="trade-grid">
+            <div><span>Entry</span><strong id="entry">—</strong></div>
+            <div><span>Stop</span><strong id="stop">—</strong></div>
+            <div><span>Target</span><strong id="target">—</strong></div>
+            <div><span>R:R</span><strong id="rr">—</strong></div>
+            <div><span>Contracts</span><strong id="contracts">0 MNQ</strong></div>
+            <div><span>Risk</span><strong id="riskDollars">$0</strong></div>
+          </div>
+        </section>
+
+        <section class="hud-card reason-card" aria-labelledby="reason-title">
+          <div class="card-kicker">DECISION TRACE</div>
+          <h2 id="reason-title">Why</h2>
+          <ul id="reasonList" class="reason-list"></ul>
+        </section>
+      </aside>
+    </main>
+
+    <section class="lower-dock">
+      <article class="hud-card chart-card">
+        <div class="dock-head"><div><span class="card-kicker">MARKET VIEW</span><h2>MNQ structure</h2></div><span class="tiny-pill">1m · SIM</span></div>
+        <div class="chart-wrap" aria-label="Simulated MNQ price chart">
+          <svg id="priceChart" viewBox="0 0 700 220" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(255,255,255,.16)"/><stop offset="1" stop-color="rgba(255,255,255,0)"/></linearGradient>
+            </defs>
+            <g class="chart-grid-lines"></g>
+            <path id="areaPath" class="area-path" d=""/>
+            <path id="linePath" class="line-path" d=""/>
+            <line id="vwapLine" class="vwap-line" x1="0" x2="700" y1="116" y2="116"/>
+          </svg>
+          <div class="chart-legend"><span><i class="legend-line price"></i>MNQ</span><span><i class="legend-line vwap"></i>VWAP</span></div>
+        </div>
+      </article>
+
+      <article class="hud-card intel-card">
+        <div class="dock-head"><div><span class="card-kicker">GLOBAL INTELLIGENCE</span><h2>Market drivers</h2></div><span class="tiny-pill" id="intelMode">CAUSAL CONTEXT</span></div>
+        <div id="intelFeed" class="intel-feed"></div>
+      </article>
+
+      <article class="hud-card log-card">
+        <div class="dock-head"><div><span class="card-kicker">ENGINE MEMORY</span><h2>Decision log</h2></div><button id="clearLog" class="ghost-btn">CLEAR</button></div>
+        <div id="decisionLog" class="decision-log"></div>
+      </article>
+    </section>
+
+    <footer class="footer-status">
+      <div><span class="status-dot live"></span> IRON BRAIN UI v0.1</div>
+      <div>SIMULATION ONLY · NO BROKER AUTHORITY · NO REAL ORDERS</div>
+      <div id="footerState">ENGINE STATE: MONITORING</div>
+    </footer>
+
+    <div class="demo-controls hud-card" aria-label="Prototype state controls">
+      <div class="demo-title">STATE TEST</div>
+      <button data-demo-state="monitoring">Monitor</button>
+      <button data-demo-state="scanning">Scan</button>
+      <button data-demo-state="analyzing">Think</button>
+      <button data-demo-state="vetoed">Veto</button>
+      <button data-demo-state="approved_long">Long</button>
+      <button data-demo-state="approved_short">Short</button>
+      <button data-demo-state="caution">Caution</button>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
