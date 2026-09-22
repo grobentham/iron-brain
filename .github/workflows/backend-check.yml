@@ -32,14 +32,19 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Syntax checks
         run: npm run check
-      - name: Native engine and grounding tests
+      - name: Native engine, grounding, and architect tests
         run: npm test
-      - name: Native-only invariants
+      - name: Native-only strategy-creator invariants
         run: |
-          grep -q "BACKEND_VERSION = '4.2.0'" api/analyze.js
+          grep -q "BACKEND_VERSION = '5.0.0'" api/analyze.js
           grep -q "externalInference: false" api/analyze.js
-          grep -q "native-deterministic-v4.2" api/analyze.js
-          grep -q "analyzeNativeShots" api/analyze.js
+          grep -q "strategy-architect-v5" api/analyze.js
+          grep -q "architectStrategy" api/analyze.js
+          grep -q "strategyKnowledgeSummary" api/analyze.js
+          grep -q "deterministic-strategy-creator" lib/strategy-architect.js
+          grep -q "Strategy Architect created this plan" lib/strategy-architect.js
+          grep -q "ARCH-" lib/strategy-architect.js
+          grep -q "sourceSetupId" lib/strategy-architect.js
           grep -q "@tesseract.js-data/eng" package.json
           grep -q "langPath: ENG_DATA.langPath" api/analyze.js
           grep -q "tessedit_char_whitelist" api/analyze.js
@@ -83,10 +88,13 @@ jobs:
           test -s vercel.json
           test -s api/analyze.js
           test -s api/health.js
+          test -s api/strategy-knowledge.js
           test -s vercel-app/api/analyze.js
+          test -s vercel-app/api/strategy-knowledge.js
           test -s vercel-app/lib/grounding.js
           test -s vercel-app/lib/native-engine.js
-          grep -q '"version": "4.2.0"' package.json
+          test -s vercel-app/lib/strategy-architect.js
+          grep -q '"version": "5.0.0"' package.json
           grep -q "NO MODEL API" index.html
           grep -q "Run native analysis" index.html
           grep -q "externalInference === false" app.js
@@ -96,13 +104,14 @@ jobs:
           grep -Fq "export const config = { maxDuration: 60 };" api/analyze.js
           grep -Fq "export { default } from '../vercel-app/api/analyze.js';" api/analyze.js
           grep -Fq "export { default } from '../vercel-app/api/health.js';" api/health.js
+          grep -Fq "export { default } from '../vercel-app/api/strategy-knowledge.js';" api/strategy-knowledge.js
           grep -q '"maxDuration": 60' vercel.json
       - name: Scan deployable source for external inference and secrets
         run: |
           if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" \
             --exclude='*.md' --exclude-dir=node_modules --exclude-dir=.git \
             api vercel-app index.html app.js package.json vercel.json; then
-            echo 'External inference reference found in deployable v4 source'
+            echo 'External inference reference found in deployable v5 source'
             exit 1
           fi
           if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' \
