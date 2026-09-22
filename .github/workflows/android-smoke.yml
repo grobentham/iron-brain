@@ -57,16 +57,25 @@ jobs:
             adb logcat -c
             adb shell am start -W -n com.ictbrain.analyzer/.MainActivity | tee /tmp/start.txt
             sleep 8
+            adb logcat -d > /tmp/logcat.txt
+            ! grep -E "FATAL EXCEPTION:.*|Process: com\.ictbrain\.analyzer" /tmp/logcat.txt
+            adb shell dumpsys activity activities | grep -q "com.ictbrain.analyzer/.MainActivity"
+
             adb shell uiautomator dump /sdcard/window.xml
             adb pull /sdcard/window.xml /tmp/window.xml
             grep -q "ICT BRAIN" /tmp/window.xml
             grep -q "See the chart" /tmp/window.xml
             grep -q "Choose screenshots" /tmp/window.xml
-            grep -q "Find one grounded trade" /tmp/window.xml
-            adb shell dumpsys activity activities | grep -q "com.ictbrain.analyzer/.MainActivity"
-            adb logcat -d > /tmp/logcat.txt
-            ! grep -E "FATAL EXCEPTION:.*|Process: com\.ictbrain\.analyzer" /tmp/logcat.txt
-            echo "Runtime smoke test passed: app installed, launched, rendered expected UI, and had no fatal crash."
+
+            # The action button is below the fold on the compact ATD viewport.
+            adb shell input swipe 160 590 160 170 700
+            sleep 1
+            adb shell uiautomator dump /sdcard/window-scrolled.xml
+            adb pull /sdcard/window-scrolled.xml /tmp/window-scrolled.xml
+            grep -q "Find one grounded trade" /tmp/window-scrolled.xml
+            grep -q "Optional context" /tmp/window-scrolled.xml
+
+            echo "Runtime smoke test passed: app installed, cold-launched, rendered top and scrolled UI, remained foreground, and had no fatal crash."
 
       - name: Upload smoke diagnostics
         if: always()
@@ -76,6 +85,7 @@ jobs:
           path: |
             /tmp/start.txt
             /tmp/window.xml
+            /tmp/window-scrolled.xml
             /tmp/logcat.txt
           if-no-files-found: ignore
           retention-days: 7
