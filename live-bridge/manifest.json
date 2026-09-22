@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ICT Brain Live Bridge",
-  "version": "1.2.0",
-  "description": "Five-chart TradingView monitoring with deterministic SMT, lifecycle tracking, and no external model APIs.",
+  "version": "1.2.1",
+  "description": "Five-chart TradingView monitoring through the local deterministic ICT Brain engine with no external model APIs.",
   "permissions": [
     "storage",
     "tabs",
@@ -12,10 +12,11 @@
   ],
   "host_permissions": [
     "https://www.tradingview.com/*",
-    "https://iron-brain.vercel.app/*"
+    "http://127.0.0.1:8787/*",
+    "http://localhost:8787/*"
   ],
   "background": {
-    "service_worker": "service-worker-v12.js",
+    "service_worker": "service-worker-local.js",
     "type": "module"
   },
   "action": {
