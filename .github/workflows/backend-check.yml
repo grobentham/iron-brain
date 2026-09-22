@@ -5,6 +5,12 @@ on:
     branches: [backend-v1, main]
     paths:
       - 'vercel-app/**'
+      - 'api/**'
+      - 'index.html'
+      - 'app.js'
+      - 'styles.css'
+      - 'package.json'
+      - 'vercel.json'
       - '.github/workflows/backend-check.yml'
   workflow_dispatch:
 
@@ -12,7 +18,7 @@ permissions:
   contents: read
 
 jobs:
-  check:
+  canonical-backend:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,6 +43,42 @@ jobs:
           grep -q "OCR-grounded prices failed local trade geometry validation" api/analyze.js
           grep -q "disallowPromptTraining: true" api/analyze.js
           if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' --exclude='*.md' --exclude-dir=node_modules .; then
+            echo 'Possible committed secret found'
+            exit 1
+          fi
+
+  root-vercel-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install root dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate root deployment files
+        run: |
+          npm run check
+          test -s index.html
+          test -s styles.css
+          test -s app.js
+          test -s package.json
+          test -s vercel.json
+          test -s api/analyze.js
+          test -s api/health.js
+          test -s vercel-app/api/analyze.js
+          test -s vercel-app/lib/grounding.js
+          grep -Fq "export { config, default } from '../vercel-app/api/analyze.js';" api/analyze.js
+          grep -Fq "export { default } from '../vercel-app/api/health.js';" api/health.js
+          grep -q "Find one grounded trade" index.html
+          grep -q "MAX_IMAGES = 4" app.js
+          node -e "import('./api/analyze.js').then(()=>console.log('root analyze wrapper import OK'))"
+          node -e "import('./api/health.js').then(()=>console.log('root health wrapper import OK'))"
+      - name: Scan deployable source for committed secrets
+        run: |
+          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' \
+            --exclude='*.md' --exclude-dir=node_modules --exclude-dir=.git \
+            api vercel-app index.html app.js styles.css package.json vercel.json; then
             echo 'Possible committed secret found'
             exit 1
           fi
