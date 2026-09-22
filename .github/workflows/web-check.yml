@@ -2,7 +2,7 @@ name: Check ICT Brain Web
 
 on:
   push:
-    branches: [web-app]
+    branches: [main, web-app]
     paths:
       - 'web/**'
       - '.github/workflows/web-check.yml'
@@ -42,7 +42,6 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
           html = Path('web/index.html').read_text(encoding='utf-8')
           assert './styles.css' in html
           assert './app.js' in html
