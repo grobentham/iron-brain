@@ -1,6 +1,6 @@
 import { supportedNativeSetups } from '../lib/native-engine.js';
 
-const VERSION = '4.0.0';
+const VERSION = '4.1.0';
 
 export default function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -10,14 +10,16 @@ export default function handler(req, res) {
     ok: true,
     service: 'ICT Brain native backend',
     version: VERSION,
-    engine: 'native-deterministic-v4',
+    engine: 'native-deterministic-v4.1',
     externalInference: false,
     aiGateway: false,
     externalModelApi: false,
     accessKeyRequired: Boolean(process.env.ICT_BRAIN_ACCESS_KEY),
     serverGrounding: true,
-    groundingMode: 'local-tesseract-price-axis + deterministic-pixel-candle-engine',
+    groundingMode: 'local-tesseract-tight-axis-two-pass + deterministic-pixel-candle-engine',
     ocrLanguageData: 'bundled-npm-package',
+    ocrNumericWhitelist: true,
+    ocrSplitLabelReassembly: true,
     supportedNativeSetups: supportedNativeSetups(),
     blockedUntilNativeAlignmentIsCertified: ['S02', 'S03', 'S04', 'S08', 'S10'],
     maxScreenshots: 4,
