@@ -9,13 +9,14 @@ export const config = { maxDuration: 60 };
 
 const require = createRequire(import.meta.url);
 const ENG_DATA = require('@tesseract.js-data/eng');
-const BACKEND_VERSION = '4.0.0';
+const BACKEND_VERSION = '4.1.0';
 const MAX_IMAGES = 4;
 const MAX_TOTAL_BYTES = 2_900_000;
 const MAX_IMAGE_BYTES = 760_000;
 const MAX_PIXELS = 32_000_000;
 const MAX_DIMENSION = 9_000;
-const OCR_TIMEOUT_MS = 10_000;
+const OCR_INIT_TIMEOUT_MS = 12_000;
+const OCR_PASS_TIMEOUT_MS = 6_500;
 const CACHE_TTL_MS = 90_000;
 const CACHE_MAX = 24;
 const RATE_WINDOW_MS = 5 * 60_000;
@@ -82,24 +83,36 @@ async function normalizeScreenshot(input) {
   if (!metadata.width || !metadata.height) throw new Error('Screenshot dimensions could not be read.');
   if (metadata.width > MAX_DIMENSION || metadata.height > MAX_DIMENSION || metadata.width * metadata.height > MAX_PIXELS) throw new Error('Screenshot dimensions are too large.');
   if ((metadata.pages || 1) > 1) throw new Error('Animated or multi-page images are not supported.');
-  const { data, info } = await source.rotate().resize({ width: 1400, height: 1400, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 86, chromaSubsampling: '4:4:4' }).toBuffer({ resolveWithObject: true });
+  const { data, info } = await source.rotate().resize({ width: 1400, height: 1400, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 88, chromaSubsampling: '4:4:4' }).toBuffer({ resolveWithObject: true });
   if (!info.width || !info.height || info.width < 320 || info.height < 240) throw new Error('Screenshot resolution is too small.');
   return { buffer: data, width: info.width, height: info.height, mime: 'image/jpeg', hash: crypto.createHash('sha256').update(data).digest('hex') };
 }
-async function makeAxisVariant(normalized, leftFraction, threshold = null) {
+async function makeAxisVariant(normalized, leftFraction, threshold = null, scale = 1.35) {
   const left = Math.max(0, Math.floor(normalized.width * leftFraction)), width = Math.max(1, normalized.width - left);
-  let pipeline = sharp(normalized.buffer).extract({ left, top: 0, width, height: normalized.height }).grayscale().normalize().sharpen();
+  let pipeline = sharp(normalized.buffer)
+    .extract({ left, top: 0, width, height: normalized.height })
+    .grayscale()
+    .normalize()
+    .sharpen({ sigma: 1.15, m1: 1.1, m2: 2.2 });
   const stats = await pipeline.clone().stats();
   if ((stats.channels?.[0]?.mean ?? 128) < 128) pipeline = pipeline.negate();
-  const targetHeight = Math.min(1900, Math.max(normalized.height, Math.round(normalized.height * 1.15)));
-  pipeline = pipeline.resize({ height: targetHeight, withoutEnlargement: false });
+  const targetHeight = Math.min(1900, Math.max(normalized.height, Math.round(normalized.height * scale)));
+  pipeline = pipeline.resize({ height: targetHeight, withoutEnlargement: false, kernel: sharp.kernel.lanczos3 });
   if (Number.isFinite(threshold)) pipeline = pipeline.threshold(threshold);
-  const { data, info } = await pipeline.png().toBuffer({ resolveWithObject: true });
-  return { buffer: data, height: info.height };
+  const { data, info } = await pipeline.png({ compressionLevel: 4 }).toBuffer({ resolveWithObject: true });
+  return { buffer: data, height: info.height, leftFraction, threshold };
 }
 async function getWorker() {
   if (!workerPromise) {
-    workerPromise = createWorker(ENG_DATA.code || 'eng', 1, { langPath: ENG_DATA.langPath, cacheMethod: 'readOnly' }).catch(error => { workerPromise = null; throw error; });
+    workerPromise = (async () => {
+      const worker = await createWorker(ENG_DATA.code || 'eng', 1, { langPath: ENG_DATA.langPath, cacheMethod: 'readOnly' });
+      await worker.setParameters({
+        tessedit_char_whitelist: '0123456789,.',
+        tessedit_pageseg_mode: '6',
+        preserve_interword_spaces: '1',
+      });
+      return worker;
+    })().catch(error => { workerPromise = null; throw error; });
   }
   return workerPromise;
 }
@@ -108,29 +121,64 @@ function timeoutPromise(promise, ms, message) {
   return Promise.race([promise.finally(() => clearTimeout(timer)), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); })]);
 }
 async function recognizeAxis(variant) {
-  const worker = await timeoutPromise(getWorker(), OCR_TIMEOUT_MS, 'Local OCR initialization timed out.');
+  const worker = await timeoutPromise(getWorker(), OCR_INIT_TIMEOUT_MS, 'Local OCR initialization timed out.');
   try {
-    return await timeoutPromise(worker.recognize(variant.buffer, {}, { hocr: true }), OCR_TIMEOUT_MS, 'Local price-axis OCR timed out.');
+    return await timeoutPromise(worker.recognize(variant.buffer, {}, { hocr: true }), OCR_PASS_TIMEOUT_MS, 'Local price-axis OCR pass timed out.');
   } catch (error) {
-    if (/timed out/i.test(error?.message || '')) { try { await worker.terminate(); } catch {} workerPromise = null; }
+    if (/timed out/i.test(error?.message || '')) {
+      try { await worker.terminate(); } catch {}
+      workerPromise = null;
+    }
     throw error;
   }
 }
-async function calibrateScreenshot(normalized) {
+async function runAxisPass(normalized, options) {
+  const started = Date.now();
+  const variant = await makeAxisVariant(normalized, options.leftFraction, options.threshold, options.scale);
   try {
-    const primary = await makeAxisVariant(normalized, 0.70, null), first = await recognizeAxis(primary);
-    let samples = parseHocrPriceSamples(first?.data?.hocr || '', primary.height), calibration = calibratePriceAxis(samples);
-    if (calibration?.strong && calibration.quality >= 72) return calibration;
-    const secondary = await makeAxisVariant(normalized, 0.77, 170), second = await recognizeAxis(secondary);
-    samples = [...samples, ...parseHocrPriceSamples(second?.data?.hocr || '', secondary.height)];
-    return calibratePriceAxis(samples);
+    const recognized = await recognizeAxis(variant);
+    const samples = parseHocrPriceSamples(recognized?.data?.hocr || '', variant.height);
+    return { samples, elapsedMs: Date.now() - started, error: '', options };
   } catch (error) {
-    return { strong: false, reason: `Local OCR unavailable: ${error?.message || 'unknown OCR error'}`, samples: [], quality: 0 };
+    return { samples: [], elapsedMs: Date.now() - started, error: error?.message || 'unknown local OCR error', options };
   }
 }
+async function calibrateScreenshot(normalized) {
+  const attempts = [];
+  const primary = await runAxisPass(normalized, { leftFraction: 0.80, threshold: null, scale: 1.35 });
+  attempts.push(primary);
+  let samples = [...primary.samples];
+  let calibration = calibratePriceAxis(samples);
+  if (calibration?.strong && calibration.quality >= 68) {
+    return { ...calibration, attempts: attempts.map(x => ({ labels: x.samples.length, elapsedMs: x.elapsedMs, error: x.error })) };
+  }
+
+  const secondary = await runAxisPass(normalized, { leftFraction: 0.84, threshold: 168, scale: 1.50 });
+  attempts.push(secondary);
+  samples = [...samples, ...secondary.samples];
+  calibration = calibratePriceAxis(samples);
+  if (!calibration.strong && attempts.every(x => x.error)) {
+    calibration.reason = `Local OCR unavailable: ${attempts.map(x => x.error).join(' | ')}`;
+  }
+  return { ...calibration, attempts: attempts.map(x => ({ labels: x.samples.length, elapsedMs: x.elapsedMs, error: x.error })) };
+}
 function publicCalibration(calibration) {
-  if (!calibration?.strong) return { strong: false, status: calibration?.reason || 'No trustworthy price-axis fit', labels: calibration?.samples?.length || 0, quality: Number(calibration?.quality || 0) };
-  return { strong: true, status: calibration.status, labels: calibration.samples.length, quality: calibration.quality, r2: Number(calibration.r2.toFixed(5)) };
+  const attempts = Array.isArray(calibration?.attempts) ? calibration.attempts : [];
+  if (!calibration?.strong) return {
+    strong: false,
+    status: calibration?.reason || 'No trustworthy price-axis fit',
+    labels: calibration?.samples?.length || 0,
+    quality: Number(calibration?.quality || 0),
+    attempts,
+  };
+  return {
+    strong: true,
+    status: calibration.status,
+    labels: calibration.samples.length,
+    quality: calibration.quality,
+    r2: Number(calibration.r2.toFixed(5)),
+    attempts,
+  };
 }
 function waitResult(reason, native, shots, calibrations = []) {
   const idx = Number.isInteger(native?.executionIndex) ? native.executionIndex : null, shot = idx !== null ? shots[idx] : null, analysis = idx !== null ? native?.analyses?.[idx] : null;
@@ -147,7 +195,10 @@ function waitResult(reason, native, shots, calibrations = []) {
 function validateNativePlan(native, shots, calibrations) {
   if (native.decision === 'WAIT' || !native.best) return waitResult(native.reason || 'No native setup passed.', native, shots, calibrations);
   const best = native.best, idx = native.executionIndex, shot = shots[idx], calibration = calibrations[idx];
-  if (!calibration?.strong) return waitResult('Execution chart price scale could not be grounded by local OCR.', native, shots, calibrations);
+  if (!calibration?.strong) {
+    const detail = calibration?.reason ? ` (${calibration.reason})` : '';
+    return waitResult(`Execution chart price scale could not be grounded by local OCR${detail}.`, native, shots, calibrations);
+  }
   const entry = priceForPermille(calibration, best.entryY), stop = priceForPermille(calibration, best.stopY), target = priceForPermille(calibration, best.targetY);
   if (!validateGeometry(best.direction, entry, stop, target)) return waitResult('Locally grounded prices failed trade geometry validation.', native, shots, calibrations);
   const ratio = rr(best.direction, entry, stop, target);
@@ -199,9 +250,32 @@ export default async function handler(req, res) {
     if (cached) { cached.meta = { ...cached.meta, requestId, cacheHit: true, processingMs: Date.now() - started, stages: { normalizeMs, nativeVisionMs: 0, groundingMs: 0 } }; return json(res, 200, cached, requestId); }
     const visionStarted = Date.now(), native = await analyzeNativeShots(shots), nativeVisionMs = Date.now() - visionStarted;
     const calibrations = Array(shots.length).fill(null); let groundingMs = 0;
-    if (native.decision !== 'WAIT' && Number.isInteger(native.executionIndex)) { const groundingStarted = Date.now(); calibrations[native.executionIndex] = await calibrateScreenshot(shots[native.executionIndex]); groundingMs = Date.now() - groundingStarted; }
+    if (native.decision !== 'WAIT' && Number.isInteger(native.executionIndex)) {
+      const groundingStarted = Date.now();
+      calibrations[native.executionIndex] = await calibrateScreenshot(shots[native.executionIndex]);
+      groundingMs = Date.now() - groundingStarted;
+    }
     const result = validateNativePlan(native, shots, calibrations);
-    const payload = { ok: true, result, meta: { requestId, backendVersion: BACKEND_VERSION, engine: 'native-deterministic-v4', externalInference: false, aiGateway: false, screenshots: shots.length, supportedNativeSetups: supportedNativeSetups(), processingMs: Date.now() - started, stages: { normalizeMs, nativeVisionMs, groundingMs }, cacheHit: false, serverGrounding: true, groundingMode: 'local-tesseract-price-axis + deterministic-pixel-candle-engine', ocrLanguageData: 'bundled-npm-package', imagesStored: false } };
+    const payload = {
+      ok: true,
+      result,
+      meta: {
+        requestId,
+        backendVersion: BACKEND_VERSION,
+        engine: 'native-deterministic-v4.1',
+        externalInference: false,
+        aiGateway: false,
+        screenshots: shots.length,
+        supportedNativeSetups: supportedNativeSetups(),
+        processingMs: Date.now() - started,
+        stages: { normalizeMs, nativeVisionMs, groundingMs },
+        cacheHit: false,
+        serverGrounding: true,
+        groundingMode: 'local-tesseract-tight-axis-two-pass + deterministic-pixel-candle-engine',
+        ocrLanguageData: 'bundled-npm-package',
+        imagesStored: false,
+      },
+    };
     setCached(fingerprint, payload);
     console.info(JSON.stringify({ event: 'ictbrain.native-analysis', requestId, decision: result.decision, setup: result.setupId, screenshots: shots.length, normalizeMs, nativeVisionMs, groundingMs, totalMs: Date.now() - started }));
     return json(res, 200, payload, requestId);
