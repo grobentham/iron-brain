@@ -40,13 +40,12 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm || true
 
-      - name: Boot emulator, install, launch, and inspect UI
+      - name: Boot test device, install, launch, and inspect UI
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
-          target: google_apis
+          target: aosp_atd
           arch: x86_64
-          profile: pixel_6
           cores: 2
           ram-size: 2048M
           disable-animations: true
@@ -54,9 +53,10 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
           script: |
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell settings put global hide_error_dialogs 1
             adb logcat -c
             adb shell am start -W -n com.ictbrain.analyzer/.MainActivity | tee /tmp/start.txt
-            sleep 6
+            sleep 8
             adb shell uiautomator dump /sdcard/window.xml
             adb pull /sdcard/window.xml /tmp/window.xml
             grep -q "ICT BRAIN" /tmp/window.xml
