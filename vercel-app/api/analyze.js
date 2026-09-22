@@ -4,13 +4,14 @@ import sharp from 'sharp';
 import { createWorker } from 'tesseract.js';
 import { analyzeNativeShots } from '../lib/native-engine.js';
 import { architectStrategy, strategyKnowledgeSummary } from '../lib/strategy-architect.js';
+import { attachNativeTimeAxis, timeAxisKnowledgeSummary } from '../lib/time-axis-v6.js';
 import { calibratePriceAxis, parseHocrPriceSamples, priceForPermille, rr, validateGeometry } from '../lib/grounding.js';
 
 export const config = { maxDuration: 60 };
 
 const require = createRequire(import.meta.url);
 const ENG_DATA = require('@tesseract.js-data/eng');
-const BACKEND_VERSION = '6.0.0';
+const BACKEND_VERSION = '6.1.0';
 const MAX_IMAGES = 4;
 const MAX_TOTAL_BYTES = 2_900_000;
 const MAX_IMAGE_BYTES = 1_250_000;
@@ -77,6 +78,15 @@ function decodeDataUrl(value) {
 function cleanLabel(value, allowed) {
   const v = String(value || 'AUTO').trim();
   return allowed.has(v) ? v : 'AUTO';
+}
+function cleanHints(value, allowedKinds, max = 40) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, max).map(x => ({
+    kind: allowedKinds.has(String(x?.kind || '')) ? String(x.kind) : 'unknown',
+    text: String(x?.text || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 40),
+    xPermille: Math.max(0, Math.min(1000, Math.round(Number(x?.xPermille) || 0))),
+    yPermille: Math.max(0, Math.min(1000, Math.round(Number(x?.yPermille) || 0))),
+  })).filter(x => x.text && x.kind !== 'unknown');
 }
 
 async function normalizeScreenshot(input) {
@@ -172,6 +182,14 @@ function publicCalibration(calibration) {
   return { strong: true, status: calibration.status, labels: calibration.samples.length, quality: calibration.quality, r2: Number(calibration.r2.toFixed(5)), method: calibration.method || '', attempts };
 }
 
+function timeEvidence(native, idx) {
+  const t = idx !== null ? native?.analyses?.[idx]?.timeAxis : null;
+  if (!t) return '';
+  return t.strong
+    ? `Native time-axis grounding: ${t.labels} labels · Q${t.quality} · ${t.timezone || 'UNKNOWN'} timezone.`
+    : `Native time-axis status: ${t.reason || 'not certified'}`;
+}
+
 function waitResult(reason, native, shots, calibrations = []) {
   const idx = Number.isInteger(native?.executionIndex) ? native.executionIndex : null;
   const shot = idx !== null ? shots[idx] : null;
@@ -181,6 +199,7 @@ function waitResult(reason, native, shots, calibrations = []) {
   if (native?.contextBias) evidence.push(`Deterministic multi-timeframe bias: ${native.contextBias}.`);
   if (native?.marketModel?.graph) evidence.push(`Market-state graph: ${native.marketModel.graph.nodes.length} primitive nodes · ${native.marketModel.graph.edges.length} relationships.`);
   if (native?.architect?.created === false && native?.architect?.reason) evidence.push(`Strategy Architect v6: ${native.architect.reason}`);
+  const te = timeEvidence(native, idx); if (te) evidence.push(te);
   const calibration = idx !== null ? calibrations[idx] : null;
   if (calibration && !calibration.strong && Array.isArray(calibration.attempts)) {
     const counts = calibration.attempts.map((x, i) => `pass ${i + 1}: ${x.labels} labels`).join(' · ');
@@ -191,6 +210,7 @@ function waitResult(reason, native, shots, calibrations = []) {
     sessionContext: '', confidence: analysis?.quality || 0, trigger: '', invalidation: '', evidence, uncertainty: [reason].filter(Boolean), reason,
     entry: null, stop: null, target: null, rr: null, executionChart: idx === null ? null : idx + 1,
     executionLabel: shot ? `Screenshot ${idx + 1} · ${shot.instrument} · ${shot.timeframe}` : null, pricing: calibrations.map(publicCalibration), strategyArchitect: native?.architect || null,
+    timeAxis: native?.timeAxis || null,
   };
 }
 function validateNativePlan(native, shots, calibrations) {
@@ -205,14 +225,20 @@ function validateNativePlan(native, shots, calibrations) {
   const evidence = best.evidence.map(x => `Screenshot ${idx + 1} · ${x}`);
   evidence.push(`Local price grounding: ${calibration.samples.length} labels · Q${calibration.quality} · ${calibration.method}.`);
   if (native.contextBias) evidence.push(`Multi-timeframe reconstructed bias: ${native.contextBias}.`);
+  const te = timeEvidence(native, idx); if (te) evidence.push(te);
+  const time = native?.analyses?.[idx]?.timeAxis;
+  const sessionContext = time?.strong
+    ? `Native time axis certified at Q${time.quality}. Session-window rules remain disabled unless the chart explicitly certifies an Eastern timezone.`
+    : 'Strategy Architect v6 used reconstructed screenshot primitives and graph relationships; no unseen session-time assumption selected the trade.';
   return {
     decision: best.direction, setupId: best.setupId, setup: best.setup, instrument: shot.instrument,
     bias: native.contextBias || (best.direction === 'LONG' ? 'BULLISH' : 'BEARISH'), dol: best.dol, dolPrice: target,
-    sessionContext: 'Strategy Architect v6 used only reconstructed screenshot primitives and their graph relationships; no named setup ID or unseen session-time assumption selected the trade.',
+    sessionContext,
     confidence, trigger: best.trigger, invalidation: best.invalidation, evidence,
-    uncertainty: ['Candles are reconstructed from screenshot pixels rather than broker OHLC data.', 'Native timestamp/session alignment and synchronized NQ↔ES SMT remain fail-closed until independently certified.'],
+    uncertainty: ['Candles are reconstructed from screenshot pixels rather than broker OHLC data.', 'Time-sensitive session logic is used only when the native time axis and timezone are explicitly certified.', 'Synchronized NQ↔ES SMT remains fail-closed until cross-market candle alignment is independently certified.'],
     reason: '', entry, stop, target, rr: Number(ratio.toFixed(2)), executionChart: idx + 1,
     executionLabel: `Screenshot ${idx + 1} · ${shot.instrument} · ${shot.timeframe}`, pricing: calibrations.map(publicCalibration), strategyArchitect: native?.architect || null,
+    timeAxis: native?.timeAxis || null,
   };
 }
 
@@ -224,7 +250,10 @@ function getCached(key) { pruneCache(); const value = resultCache.get(key); retu
 function setCached(key, payload) { resultCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, payload: structuredClone(payload) }); pruneCache(); }
 function requestFingerprint(shots) {
   const h = crypto.createHash('sha256'); h.update(BACKEND_VERSION);
-  for (const shot of shots) { h.update(shot.hash); h.update(shot.instrument); h.update(shot.timeframe); }
+  for (const shot of shots) {
+    h.update(shot.hash); h.update(shot.instrument); h.update(shot.timeframe);
+    h.update(JSON.stringify(shot.timeHints || [])); h.update(String(shot.timezoneHint || ''));
+  }
   return h.digest('hex');
 }
 
@@ -241,7 +270,21 @@ export default async function handler(req, res) {
     if (!Array.isArray(body.screenshots)) return json(res, 400, { ok: false, requestId, error: 'screenshots must be an array.' }, requestId);
     if (!body.screenshots.length) return json(res, 400, { ok: false, requestId, error: 'Add at least one screenshot.' }, requestId);
     if (body.screenshots.length > MAX_IMAGES) return json(res, 400, { ok: false, requestId, error: 'Maximum four screenshots.' }, requestId);
-    const decoded = body.screenshots.map((s, i) => ({ index: i + 1, ...decodeDataUrl(s?.dataUrl), instrument: cleanLabel(s?.instrument, INSTRUMENTS), timeframe: cleanLabel(s?.timeframe, TIMEFRAMES) }));
+    const decoded = body.screenshots.map((s, i) => ({
+      index: i + 1,
+      ...decodeDataUrl(s?.dataUrl),
+      instrument: cleanLabel(s?.instrument, INSTRUMENTS),
+      timeframe: cleanLabel(s?.timeframe, TIMEFRAMES),
+      capturedAt: Number.isFinite(Number(s?.capturedAt)) ? Number(s.capturedAt) : 0,
+      captureFingerprint: String(s?.captureFingerprint || '').slice(0, 40),
+      captureMethod: String(s?.captureMethod || '').slice(0, 60),
+      timeHints: cleanHints(s?.timeHints, new Set(['time', 'date']), 40),
+      priceHints: cleanHints(s?.priceHints, new Set(['price']), 30),
+      timezoneHint: String(s?.timezoneHint || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 60),
+      chartRegion: s?.chartRegion && Number.isFinite(Number(s.chartRegion.width)) && Number.isFinite(Number(s.chartRegion.height))
+        ? { width: Math.round(Number(s.chartRegion.width)), height: Math.round(Number(s.chartRegion.height)) }
+        : null,
+    }));
     if (decoded.reduce((n, s) => n + s.buffer.length, 0) > MAX_TOTAL_BYTES) return json(res, 413, { ok: false, requestId, error: 'Screenshots are too large. The browser should resize them before upload.' }, requestId);
 
     const normalizeStarted = Date.now();
@@ -252,11 +295,17 @@ export default async function handler(req, res) {
     for (const shot of shots) { if (seen.has(shot.hash)) return json(res, 400, { ok: false, requestId, error: 'Duplicate screenshots detected. Each slot must contain a distinct chart.' }, requestId); seen.add(shot.hash); }
 
     const fingerprint = requestFingerprint(shots), cached = getCached(fingerprint);
-    if (cached) { cached.meta = { ...cached.meta, requestId, cacheHit: true, processingMs: Date.now() - started, stages: { normalizeMs, nativeVisionMs: 0, architectMs: 0, groundingMs: 0 } }; return json(res, 200, cached, requestId); }
+    if (cached) {
+      cached.meta = { ...cached.meta, requestId, cacheHit: true, processingMs: Date.now() - started, stages: { normalizeMs, nativeVisionMs: 0, timeAxisMs: 0, architectMs: 0, groundingMs: 0 } };
+      return json(res, 200, cached, requestId);
+    }
 
     const visionStarted = Date.now();
-    const perceived = await analyzeNativeShots(shots);
+    const rawPerceived = await analyzeNativeShots(shots);
     const nativeVisionMs = Date.now() - visionStarted;
+    const timeStarted = Date.now();
+    const perceived = attachNativeTimeAxis(rawPerceived, shots);
+    const timeAxisMs = Date.now() - timeStarted;
     const architectStarted = Date.now();
     const native = architectStrategy(perceived, shots);
     const architectMs = Date.now() - architectStarted;
@@ -269,23 +318,27 @@ export default async function handler(req, res) {
     }
     const result = validateNativePlan(native, shots, calibrations);
     const knowledge = strategyKnowledgeSummary();
+    const timeKnowledge = timeAxisKnowledgeSummary();
     const payload = {
       ok: true, result,
       meta: {
         requestId, backendVersion: BACKEND_VERSION,
-        engine: 'native-perception-v4.2+market-model-v6+strategy-architect-v6',
+        engine: 'native-perception-v4.2+time-axis-v6.1+market-model-v6+strategy-architect-v6',
         strategyCreator: 'primitive-market-graph-strategy-creator-v6', strategyKnowledgeVersion: knowledge.version,
+        timeAxisKnowledgeVersion: timeKnowledge.version,
         namedDetectorIndependent: true, adversarialCritic: true,
         externalInference: false, aiGateway: false, externalModelApi: false, screenshots: shots.length,
-        processingMs: Date.now() - started, stages: { normalizeMs, nativeVisionMs, architectMs, groundingMs }, cacheHit: false,
-        serverGrounding: true, groundingMode: 'local-tesseract-hires-adaptive-three-pass + deterministic-pixel-candle-engine',
+        processingMs: Date.now() - started, stages: { normalizeMs, nativeVisionMs, timeAxisMs, architectMs, groundingMs }, cacheHit: false,
+        serverGrounding: true, groundingMode: 'local-tesseract-hires-adaptive-three-pass + deterministic-pixel-candle-engine + deterministic-time-axis-fit',
         ocrLanguageData: 'bundled-npm-package', strategyCreated: Boolean(native?.architect?.created), strategyId: native?.architect?.strategyId || null,
         marketGraphNodes: native?.marketModel?.graph?.nodes?.length || 0, marketGraphEdges: native?.marketModel?.graph?.edges?.length || 0,
+        timeAxis: native?.timeAxis || null,
+        bridgeVersion: String(body?.bridgeVersion || '').slice(0, 20) || null,
         imagesStored: false,
       },
     };
     setCached(fingerprint, payload);
-    console.info(JSON.stringify({ event: 'ictbrain.strategy-architect-v6', requestId, decision: result.decision, strategy: result.setupId, screenshots: shots.length, normalizeMs, nativeVisionMs, architectMs, groundingMs, totalMs: Date.now() - started }));
+    console.info(JSON.stringify({ event: 'ictbrain.strategy-architect-v6.1', requestId, decision: result.decision, strategy: result.setupId, screenshots: shots.length, normalizeMs, nativeVisionMs, timeAxisMs, architectMs, groundingMs, totalMs: Date.now() - started }));
     return json(res, 200, payload, requestId);
   } catch (error) {
     const message = /timed out/i.test(error?.message || '') ? 'Local analysis timed out safely. No trade was produced.' : (error?.message || 'Native analysis failed safely. Please retry.');
