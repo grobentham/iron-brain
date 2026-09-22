@@ -2,7 +2,7 @@ name: Check ICT Brain Backend
 
 on:
   push:
-    branches: [backend-v1, main]
+    branches: [backend-v1, backend-v3.1, main]
     paths:
       - 'vercel-app/**'
       - 'api/**'
@@ -36,12 +36,18 @@ jobs:
         run: npm test
       - name: Safety invariants
         run: |
+          grep -q "BACKEND_VERSION = '3.1.0'" api/analyze.js
           grep -q "MAX_IMAGES = 4" api/analyze.js
           grep -q "MIN_ACTIONABLE_CONFIDENCE = 60" api/analyze.js
           grep -q "DO NOT output numeric prices" api/analyze.js
-          grep -q "priceForPermille" api/analyze.js
+          grep -q "Duplicate screenshots detected" api/analyze.js
+          grep -q "execution screenshot instrument and timeframe instead of AUTO" api/analyze.js
           grep -q "OCR-grounded prices failed local trade geometry validation" api/analyze.js
           grep -q "disallowPromptTraining: true" api/analyze.js
+          grep -q "FALLBACK_MODELS" api/analyze.js
+          grep -q "CACHE_TTL_MS = 90_000" api/analyze.js
+          grep -q "RATE_WINDOW_MS = 5 \* 60_000" api/analyze.js
+          grep -q "groundingMode: 'execution-chart-only-two-pass-ocr'" api/analyze.js
           if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' --exclude='*.md' --exclude-dir=node_modules .; then
             echo 'Possible committed secret found'
             exit 1
@@ -70,6 +76,7 @@ jobs:
           test -s vercel-app/lib/grounding.js
           grep -Fq "export { config, default } from '../vercel-app/api/analyze.js';" api/analyze.js
           grep -Fq "export { default } from '../vercel-app/api/health.js';" api/health.js
+          grep -q '"version": "3.1.0"' package.json
           grep -q "Find one grounded trade" index.html
           grep -q "MAX_IMAGES = 4" app.js
           node -e "import('./api/analyze.js').then(()=>console.log('root analyze wrapper import OK'))"
