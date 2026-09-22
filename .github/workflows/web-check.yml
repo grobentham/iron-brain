@@ -1,0 +1,50 @@
+name: Check ICT Brain Web
+
+on:
+  push:
+    branches: [main, web-app]
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JavaScript syntax
+        run: node --check web/app.js
+
+      - name: Validate required one-trade invariants
+        run: |
+          test -s web/index.html
+          test -s web/styles.css
+          test -s web/app.js
+          grep -q 'MAX_IMAGES = 4' web/app.js
+          grep -q 'MIN_ACTIONABLE_CONFIDENCE = 60' web/app.js
+          grep -q 'responseConstraint: RESPONSE_SCHEMA' web/app.js
+          grep -q 'priceForPermille' web/app.js
+          grep -q 'OCR-grounded prices failed local trade geometry validation' web/app.js
+          grep -q 'ONE OCR-GROUNDED TRADE' web/app.js
+          grep -q 'Find one grounded trade' web/index.html
+          grep -q 'tesseract.js@7.0.0' web/index.html
+          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|OPENAI_API_KEY|GEMINI_API_KEY)' web; then
+            echo 'Possible API credential or secret reference found in web app'
+            exit 1
+          fi
+
+      - name: Verify static dependency URLs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html = Path('web/index.html').read_text(encoding='utf-8')
+          assert './styles.css' in html
+          assert './app.js' in html
+          assert 'https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js' in html
+          print('Static web checks passed')
+          PY
