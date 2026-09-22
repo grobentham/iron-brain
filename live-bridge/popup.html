@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ICT Brain Live Bridge</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">ICT BRAIN</p>
+        <h1>Live Bridge</h1>
+      </div>
+      <span id="monitorBadge" class="badge off">OFF</span>
+    </header>
+
+    <section class="card current">
+      <div class="row between">
+        <div>
+          <p class="label">Current tab</p>
+          <p id="currentTab" class="value">Checking…</p>
+        </div>
+        <span id="tabState" class="mini">—</span>
+      </div>
+      <div class="grid2">
+        <label>Instrument
+          <select id="instrument">
+            <option>AUTO</option><option>NQ</option><option>MNQ</option><option>ES</option>
+          </select>
+        </label>
+        <label>Timeframe
+          <select id="timeframe">
+            <option>AUTO</option><option>1m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1H</option><option>4H</option><option>1D</option>
+          </select>
+        </label>
+      </div>
+      <button id="connectBtn" class="primary">Connect current TradingView tab</button>
+    </section>
+
+    <section class="card">
+      <div class="row between">
+        <div>
+          <p class="label">Connected charts</p>
+          <p class="hint">Up to 4 TradingView tabs</p>
+        </div>
+        <span id="connectedCount" class="counter">0 / 4</span>
+      </div>
+      <div id="connectedList" class="connected-list"></div>
+    </section>
+
+    <section class="card">
+      <div class="row between">
+        <div>
+          <p class="label">Live Scan</p>
+          <p class="hint">Scans all connected charts in one backend request.</p>
+        </div>
+        <label class="switch">
+          <input id="monitorToggle" type="checkbox" />
+          <span></span>
+        </label>
+      </div>
+      <label>Scan interval
+        <select id="interval">
+          <option value="30">30 seconds</option>
+          <option value="60">1 minute</option>
+          <option value="120">2 minutes</option>
+          <option value="300">5 minutes</option>
+        </select>
+      </label>
+      <button id="scanBtn" class="secondary">Scan now</button>
+    </section>
+
+    <section class="card result-card">
+      <div class="row between">
+        <p class="label">Latest result</p>
+        <span id="scanTime" class="mini">Never</span>
+      </div>
+      <div id="result" class="result wait">No scan yet.</div>
+      <p id="error" class="error"></p>
+    </section>
+
+    <details class="card settings">
+      <summary>Private settings</summary>
+      <label>ICT Brain access key
+        <input id="accessKey" type="password" autocomplete="off" placeholder="Only if configured on Vercel" />
+      </label>
+      <label>Backend URL
+        <input id="backendUrl" type="url" value="https://iron-brain.vercel.app/api/analyze" />
+      </label>
+      <button id="saveSettingsBtn" class="secondary">Save settings</button>
+    </details>
+
+    <p class="foot">Captures only TradingView chart canvases from tabs you explicitly connect. No broker orders. No external model API.</p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
