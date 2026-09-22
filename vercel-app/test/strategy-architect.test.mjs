@@ -27,16 +27,18 @@ function native(extra={}) {
 test('market model is built from reconstructed candles rather than named setup IDs', () => {
   const model=buildMarketModel(native(),[{instrument:'MNQ',timeframe:'1m'}]);
   assert.equal(model.ok,true);
-  assert.equal(model.version,'6.0.0');
+  assert.equal(model.version,'6.3.0');
   assert.ok(model.graph.nodes.length>0);
   assert.ok(model.primitives.swings.length>0);
+  assert.equal(model.charts.length,1);
+  assert.ok(Array.isArray(model.dol.LONG));
 });
 
 test('strategy creator declares named-detector independence and never exposes S11 as its strategy identity', () => {
   const out=architectStrategy(native(),[{instrument:'MNQ',timeframe:'1m'}]);
   assert.equal(out.architect.namedDetectorIndependent,true);
   if (out.architect.created) {
-    assert.match(out.best.setupId,/^ARCH6-/);
+    assert.match(out.best.setupId,/^ARCH63-/);
     assert.equal(out.best.sourceSetupId,null);
     assert.notEqual(out.best.setupId,'S11');
   } else {
@@ -44,16 +46,18 @@ test('strategy creator declares named-detector independence and never exposes S1
   }
 });
 
-test('knowledge summary describes primitive graph plus adversarial critic', () => {
+test('knowledge summary describes unified MTF graph, ranked DOL and adversarial critic', () => {
   const knowledge=strategyKnowledgeSummary();
-  assert.equal(knowledge.version,'6.0.0');
+  assert.equal(knowledge.version,'6.3.0');
   assert.equal(knowledge.externalInference,false);
   assert.equal(knowledge.namedDetectorIndependent,true);
   assert.equal(knowledge.failClosed,true);
-  assert.ok(knowledge.knowledgeDomains.length>=8);
+  assert.ok(knowledge.knowledgeDomains.includes('synchronized NQ↔ES SMT'));
   assert.ok(knowledge.criticChecks.length>=6);
   const market=marketModelKnowledgeSummary();
   assert.equal(market.namedDetectorIndependent,true);
+  assert.ok(market.dolRanking.length>=5);
+  assert.equal(market.synchronizedSMT.failClosed,true);
 });
 
 test('visual price-like coordinates map deterministically to permille y', () => {
