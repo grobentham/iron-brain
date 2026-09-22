@@ -11,7 +11,7 @@
     <header>
       <div>
         <p class="eyebrow">ICT BRAIN</p>
-        <h1>Live Bridge <span class="mini">v1.1</span></h1>
+        <h1>Live Bridge <span class="mini">v1.2</span></h1>
       </div>
       <span id="monitorBadge" class="badge off">OFF</span>
     </header>
@@ -43,9 +43,9 @@
       <div class="row between">
         <div>
           <p class="label">Connected charts</p>
-          <p class="hint">Up to 4 TradingView tabs · remembered across browser restarts</p>
+          <p class="hint">Up to 5 TradingView tabs · recommended: NQ 1H, NQ 15m, MNQ 5m, MNQ 1m, ES 1m</p>
         </div>
-        <span id="connectedCount" class="counter">0 / 4</span>
+        <span id="connectedCount" class="counter">0 / 5</span>
       </div>
       <div id="connectedList" class="connected-list"></div>
     </section>
@@ -54,7 +54,7 @@
       <div class="row between">
         <div>
           <p class="label">Live Scan</p>
-          <p class="hint">Only calls the backend when a connected chart actually changes.</p>
+          <p class="hint">Only analyzes when a connected chart changes. Five-chart mode preserves the full MTF stack plus synchronized 1m SMT.</p>
         </div>
         <label class="switch">
           <input id="monitorToggle" type="checkbox" />
@@ -86,7 +86,9 @@
         <span id="scanTime" class="mini">Never</span>
       </div>
       <div id="result" class="result wait">No scan yet.</div>
+      <p id="lifecycleDetail" class="hint"></p>
       <p id="timeStatus" class="hint"></p>
+      <p id="marketStatus" class="hint"></p>
       <p id="error" class="error"></p>
     </section>
 
@@ -101,8 +103,8 @@
       <button id="saveSettingsBtn" class="secondary">Save settings</button>
     </details>
 
-    <p class="foot">Authorized TradingView tabs only. Canvas + visible axis labels. Change-aware monitoring. No broker orders. No external model API.</p>
+    <p class="foot">Authorized TradingView tabs only. Five-chart native monitoring. No broker orders. No external model API.</p>
   </main>
-  <script src="popup.js"></script>
+  <script src="popup-v12.js"></script>
 </body>
 </html>
