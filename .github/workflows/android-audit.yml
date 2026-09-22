@@ -1,0 +1,78 @@
+name: Audit ICT Brain Android APK
+
+on:
+  push:
+    branches: [android-apk-v2]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Install Android platform/build tools
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Build and lint
+        working-directory: android
+        run: gradle :app:assembleDebug :app:lintDebug --stacktrace
+
+      - name: Verify signing and manifest
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/signing.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$APK" | tee /tmp/badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump permissions "$APK" | tee /tmp/permissions.txt
+          unzip -t "$APK" | tee /tmp/ziptest.txt
+          sha256sum "$APK" | tee /tmp/sha256.txt
+
+      - name: Reject unexpected dangerous/network permissions
+        run: |
+          if grep -E "android.permission.(INTERNET|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|CAMERA|RECORD_AUDIO|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION)" /tmp/permissions.txt; then
+            echo "Unexpected sensitive/network permission found"
+            exit 1
+          fi
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-audit-reports
+          path: |
+            /tmp/signing.txt
+            /tmp/badging.txt
+            /tmp/permissions.txt
+            /tmp/ziptest.txt
+            /tmp/sha256.txt
+            android/app/build/reports/lint-results-debug.html
+            android/app/build/reports/lint-results-debug.txt
+          if-no-files-found: ignore
+          retention-days: 7
