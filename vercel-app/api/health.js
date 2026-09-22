@@ -1,8 +1,10 @@
 import { supportedNativeSetups } from '../lib/native-engine.js';
+import { strategyKnowledgeSummary } from '../lib/strategy-architect.js';
 
-const VERSION = '4.2.0';
+const VERSION = '5.0.0';
 
 export default function handler(req, res) {
+  const knowledge = strategyKnowledgeSummary();
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -10,7 +12,11 @@ export default function handler(req, res) {
     ok: true,
     service: 'ICT Brain native backend',
     version: VERSION,
-    engine: 'native-deterministic-v4.2',
+    engine: 'native-deterministic-v4.2+strategy-architect-v5',
+    strategyCreator: 'deterministic-strategy-architect-v5',
+    strategyCreatorOwnsSelection: true,
+    strategyKnowledgeVersion: knowledge.version,
+    knowledgeDomains: knowledge.knowledgeDomains,
     externalInference: false,
     aiGateway: false,
     externalModelApi: false,
@@ -21,12 +27,13 @@ export default function handler(req, res) {
     ocrNumericWhitelist: true,
     ocrSplitLabelReassembly: true,
     ocrHighResolutionSource: true,
-    supportedNativeSetups: supportedNativeSetups(),
+    sourceDetectors: supportedNativeSetups(),
     blockedUntilNativeAlignmentIsCertified: ['S02', 'S03', 'S04', 'S08', 'S10'],
     maxScreenshots: 4,
     oneTradeOnly: true,
     failClosed: true,
     inMemoryResultCacheSeconds: 90,
     bestEffortRateLimitPerFiveMinutes: Math.max(1, Number(process.env.ICT_BRAIN_RATE_LIMIT || 18)),
+    limitation: knowledge.limitation,
   });
 }
