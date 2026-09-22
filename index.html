@@ -19,14 +19,14 @@
     <section class="hero">
       <p class="eyebrow">GITHUB PAGES UI · LOCAL ENGINE · NO MODEL API · ONE TRADE</p>
       <h1>See the chart.<br>Reconstruct the setup.</h1>
-      <p class="lede">The website is a static interface hosted by GitHub Pages. Analysis runs in your own ICT Brain engine on this PC, not on GitHub and not through an external AI/model API.</p>
+      <p class="lede">The website is a static interface hosted by GitHub Pages. Analysis runs in your own ICT Brain engine on this PC. After the one-time Windows install, the engine starts automatically when you sign in and the webpage connects to it directly.</p>
     </section>
 
     <section class="block">
       <div class="heading"><div><span>01</span><h2>Your charts</h2></div><strong id="count">0 / 4</strong></div>
       <label class="drop" for="files"><b>Add screenshots</b><small>PNG, JPG or WEBP · up to four in manual upload mode</small></label>
       <input id="files" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
-      <p class="hint">Recommended manual stack: <b>1H NQ → 15m NQ → 5m MNQ → 1m MNQ</b>. Live Bridge v1.2 handles the five-chart stack including ES 1m.</p>
+      <p class="hint">Recommended manual stack: <b>1H NQ → 15m NQ → 5m MNQ → 1m MNQ</b>. Live Bridge v1.2.1 handles the five-chart stack including ES 1m.</p>
       <div id="shots" class="shots"></div>
     </section>
 
@@ -37,7 +37,7 @@
         <summary>Local engine connection</summary>
         <label for="backendUrl">Engine URL</label>
         <input id="backendUrl" type="url" value="http://127.0.0.1:8787" autocomplete="off" spellcheck="false">
-        <p class="hint">Default: <b>http://127.0.0.1:8787</b>. This points only to your own computer. Start the local ICT Brain engine before running analysis.</p>
+        <p class="hint">Default: <b>http://127.0.0.1:8787</b>. The engine listens only on your own computer. Modern Chromium browsers may ask once for permission to let this GitHub Pages site access the loopback service; approve that prompt for ICT Brain to connect.</p>
         <label for="accessKey">Optional access key</label>
         <input id="accessKey" type="password" autocomplete="off" placeholder="Leave blank for the normal local engine">
         <p class="hint">Connection settings are stored only in this browser.</p>
@@ -52,7 +52,7 @@
     <section id="result" class="result" hidden aria-live="polite"></section>
 
     <footer>
-      <p><b>Privacy:</b> GitHub Pages serves only the static website files. When using the default local engine URL, screenshots are sent to the ICT Brain process running on your own PC. No broker orders are placed.</p>
+      <p><b>Privacy:</b> GitHub Pages serves only the static website files. When using the default local engine URL, screenshots are sent to the ICT Brain process running on your own PC. The local engine binds to loopback only, not your LAN. No broker orders are placed.</p>
       <p class="hint">Research support only. Confidence is deterministic evidence quality, not win probability.</p>
     </footer>
   </main>

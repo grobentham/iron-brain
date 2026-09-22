@@ -28,6 +28,19 @@ function normalizeBackendUrl(value='') {
   return raw.replace(/\/+$/, '');
 }
 function backendBase() { return normalizeBackendUrl(els.backendUrl.value); }
+function isLoopbackUrl(url='') { return /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?(?:\/|$)/i.test(String(url)); }
+function localFetch(url, options={}) {
+  const init = { mode: 'cors', ...options };
+  if (isLoopbackUrl(url)) init.targetAddressSpace = 'loopback';
+  return fetch(url, init);
+}
+async function loopbackPermissionState() {
+  if (!navigator.permissions?.query) return 'unknown';
+  for (const name of ['loopback-network', 'local-network-access']) {
+    try { return (await navigator.permissions.query({ name })).state || 'unknown'; } catch {}
+  }
+  return 'unknown';
+}
 function esc(v='') { return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function money(v) { return Number.isFinite(Number(v)) ? Number(v).toFixed(2).replace(/\.00$/,'') : '—'; }
 function setStatus(text, kind='') { els.status.textContent = text; els.status.className = `pill ${kind}`.trim(); }
@@ -45,7 +58,7 @@ async function checkBackend() {
   setStatus('Checking local engine…');
   updateButton();
   try {
-    const r = await fetch(`${backendBase()}/health`, { cache: 'no-store', headers: authHeaders(false) });
+    const r = await localFetch(`${backendBase()}/health`, { cache: 'no-store', headers: authHeaders(false) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
     const nativeEngine = Boolean(j.ok && j.externalInference === false && (j.nativeTimeAxis || String(j.engine || '').includes('native')));
@@ -53,7 +66,8 @@ async function checkBackend() {
     setStatus(state.backendReady ? `Local engine ${j.version || ''} ready` : 'Wrong local engine', state.backendReady ? 'ok' : 'bad');
   } catch {
     state.backendReady = false;
-    setStatus('Local engine offline', 'bad');
+    const permission = await loopbackPermissionState();
+    setStatus(permission === 'denied' ? 'Local access blocked in browser permissions' : 'Local engine offline', 'bad');
   }
   updateButton();
 }
@@ -127,7 +141,7 @@ function renderResult(data) {
   const actionable = r.decision === 'LONG' || r.decision === 'SHORT';
   const numbers = actionable ? `<div class="numbers"><div class="number"><small>ENTRY</small><b>${money(r.entry)}</b></div><div class="number"><small>STOP</small><b>${money(r.stop)}</b></div><div class="number"><small>TAKE PROFIT</small><b>${money(r.target)}</b></div><div class="number"><small>R:R</small><b>${Number(r.rr).toFixed(2)}</b></div></div>` : '';
   const stages = data.meta?.stages || {};
-  const lifecycle = r.lifecycle?.state || r.strategyLifecycle?.state || '';
+  const lifecycle = r.lifecycle?.stage || r.strategyLifecycle?.stage || '';
   els.result.innerHTML = `<div class="result-head"><div><h2 class="decision ${decisionClass}">${esc(r.decision === 'WAIT' ? 'Wait.' : r.decision === 'LONG' ? 'Long.' : 'Short.')}</h2><p class="setup">${esc(r.setupId)} · ${esc(r.setup)}</p></div><span class="confidence">${Math.round(r.confidence || 0)}% evidence</span></div>${lifecycle ? `<p class="hint"><b>Lifecycle:</b> ${esc(lifecycle)}</p>` : ''}${numbers}<div class="grid"><div class="tile"><small>Instrument</small><b>${esc(r.instrument)}</b></div><div class="tile"><small>Bias</small><b>${esc(r.bias)}</b></div><div class="tile"><small>Draw on liquidity</small><b>${esc(r.dol)}${r.dolPrice ? ` · ${money(r.dolPrice)}` : ''}</b></div><div class="tile"><small>Execution chart</small><b>${esc(r.executionLabel || 'None')}</b></div></div>${r.reason ? `<p class="error"><b>Why WAIT:</b> ${esc(r.reason)}</p>` : ''}${r.trigger ? `<h3>Entry trigger</h3><p>${esc(r.trigger)}</p>` : ''}${r.invalidation ? `<h3>Invalidation</h3><p>${esc(r.invalidation)}</p>` : ''}${r.sessionContext ? `<h3>Session context</h3><p>${esc(r.sessionContext)}</p>` : ''}<h3>Why this decision</h3>${list(r.evidence)}<h3>Uncertainty</h3>${list(r.uncertainty)}<p class="hint">Local native engine ${esc(data.meta?.backendVersion || '')} · ${Number.isFinite(Number(data.meta?.processingMs)) ? `${(data.meta.processingMs/1000).toFixed(1)}s total · ` : ''}vision ${((stages.nativeVisionMs || 0)/1000).toFixed(1)}s · grounding ${((stages.groundingMs || 0)/1000).toFixed(1)}s · no external model API.</p>`;
   els.result.hidden = false;
   els.result.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -156,7 +170,7 @@ els.analyze.addEventListener('click', async () => {
     els.progressText.textContent = 'Local engine is reconstructing the market state…';
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 75_000);
-    const response = await fetch(`${backendBase()}/analyze`, {
+    const response = await localFetch(`${backendBase()}/analyze`, {
       method:'POST', headers: authHeaders(true), signal: controller.signal, body: JSON.stringify({ screenshots, client: 'github-pages-ui' })
     });
     clearTimeout(timer);
