@@ -36,7 +36,7 @@ jobs:
           grep -q "priceForPermille" api/analyze.js
           grep -q "OCR-grounded prices failed local trade geometry validation" api/analyze.js
           grep -q "disallowPromptTraining: true" api/analyze.js
-          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' --exclude='*.md' .; then
+          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' --exclude='*.md' --exclude-dir=node_modules .; then
             echo 'Possible committed secret found'
             exit 1
           fi
