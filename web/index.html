@@ -21,6 +21,25 @@
       <p class="lede">Add up to four chart screenshots. The browser reads the visible price scale locally, asks Chrome’s built-in on-device model to identify one setup, then validates the prices itself.</p>
     </section>
 
+    <section class="section-block" id="modelSetup">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">LOCAL AI</p>
+          <h2>Prepare Chrome once</h2>
+        </div>
+        <span class="muted" id="modelPercent">0%</span>
+      </div>
+      <p id="modelMessage" class="microcopy">Checking whether Chrome’s local model is already installed…</p>
+      <div aria-hidden="true" style="height:8px;border-radius:999px;background:rgba(20,20,20,.08);overflow:hidden;margin:14px 0 16px;">
+        <div id="modelProgressBar" style="height:100%;width:0%;background:#171717;border-radius:999px;transition:width .25s ease;"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <button type="button" id="prepareModelButton" class="primary-button">Prepare local AI</button>
+        <button type="button" id="cancelModelButton" class="remove-button" hidden>Cancel</button>
+      </div>
+      <p class="microcopy" style="margin-top:14px;">This is a one-time Chrome model setup, not chart analysis. If it remains at 0%, open <strong>chrome://on-device-internals</strong> in a new tab and check the model status. Chrome currently requires supported desktop hardware, enough free storage and an unmetered connection for the initial download.</p>
+    </section>
+
     <section class="section-block">
       <div class="section-heading">
         <div>
@@ -68,6 +87,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js"></script>
+  <script src="./model-helper.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>
