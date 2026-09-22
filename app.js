@@ -2,6 +2,7 @@ const MAX_IMAGES = 4;
 const MAX_SIDE = 1800;
 const MAX_SINGLE_IMAGE_BYTES = 1_200_000;
 const MAX_TOTAL_BINARY_BYTES = 2_800_000;
+const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8787';
 const INSTRUMENTS = ['AUTO','NQ','MNQ','ES'];
 const TIMEFRAMES = ['AUTO','1m','3m','5m','15m','30m','1H','4H','1D'];
 
@@ -9,29 +10,50 @@ const state = { shots: [], backendReady: false, analyzing: false };
 const $ = id => document.getElementById(id);
 const els = {
   files: $('files'), shots: $('shots'), count: $('count'), analyze: $('analyze'),
-  progress: $('progress'), progressText: $('progressText'), result: $('result'), status: $('backendStatus'), accessKey: $('accessKey')
+  progress: $('progress'), progressText: $('progressText'), result: $('result'), status: $('backendStatus'),
+  accessKey: $('accessKey'), backendUrl: $('backendUrl')
 };
 
 els.accessKey.value = localStorage.getItem('ictbrain-access-key') || '';
+els.backendUrl.value = localStorage.getItem('ictbrain-backend-url') || DEFAULT_BACKEND_URL;
 els.accessKey.addEventListener('change', () => localStorage.setItem('ictbrain-access-key', els.accessKey.value.trim()));
+els.backendUrl.addEventListener('change', () => {
+  localStorage.setItem('ictbrain-backend-url', normalizeBackendUrl(els.backendUrl.value));
+  els.backendUrl.value = normalizeBackendUrl(els.backendUrl.value);
+  checkBackend();
+});
 
-function esc(v='') { return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c])); }
+function normalizeBackendUrl(value='') {
+  const raw = String(value || '').trim() || DEFAULT_BACKEND_URL;
+  return raw.replace(/\/+$/, '');
+}
+function backendBase() { return normalizeBackendUrl(els.backendUrl.value); }
+function esc(v='') { return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function money(v) { return Number.isFinite(Number(v)) ? Number(v).toFixed(2).replace(/\.00$/,'') : '—'; }
 function setStatus(text, kind='') { els.status.textContent = text; els.status.className = `pill ${kind}`.trim(); }
 function updateButton() { els.analyze.disabled = state.analyzing || !state.backendReady || state.shots.length === 0; }
 function setBusy(on, text='') { state.analyzing = on; els.progress.hidden = !on; if (text) els.progressText.textContent = text; updateButton(); }
+function authHeaders(includeJson=false) {
+  const headers = includeJson ? { 'Content-Type':'application/json' } : {};
+  const key = els.accessKey.value.trim();
+  if (key) headers['x-ictbrain-key'] = key;
+  return headers;
+}
 
 async function checkBackend() {
+  state.backendReady = false;
+  setStatus('Checking local engine…');
+  updateButton();
   try {
-    const r = await fetch('/api/health', { cache: 'no-store' });
+    const r = await fetch(`${backendBase()}/health`, { cache: 'no-store', headers: authHeaders(false) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
-    const nativeV4 = String(j.engine || '').startsWith('native-deterministic-v4');
-    state.backendReady = Boolean(j.ok && j.externalInference === false && nativeV4);
-    setStatus(state.backendReady ? `Native backend ${j.version || ''} ready` : 'Wrong backend version', state.backendReady ? 'ok' : 'bad');
+    const nativeEngine = Boolean(j.ok && j.externalInference === false && (j.nativeTimeAxis || String(j.engine || '').includes('native')));
+    state.backendReady = nativeEngine;
+    setStatus(state.backendReady ? `Local engine ${j.version || ''} ready` : 'Wrong local engine', state.backendReady ? 'ok' : 'bad');
   } catch {
     state.backendReady = false;
-    setStatus('Backend unavailable', 'bad');
+    setStatus('Local engine offline', 'bad');
   }
   updateButton();
 }
@@ -45,7 +67,7 @@ els.files.addEventListener('change', event => {
 });
 
 function renderShots() {
-  els.count.textContent = `${state.shots.length} / 4`;
+  els.count.textContent = `${state.shots.length} / ${MAX_IMAGES}`;
   els.shots.innerHTML = '';
   state.shots.forEach((shot, i) => {
     const card = document.createElement('article');
@@ -69,8 +91,11 @@ async function canvasBlob(bitmap, maxSide, quality) {
   canvas.width = Math.max(1, Math.round(bitmap.width * scale));
   canvas.height = Math.max(1, Math.round(bitmap.height * scale));
   const ctx = canvas.getContext('2d', { alpha: false });
-  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
   return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
 }
 function imageBudget() {
@@ -86,8 +111,8 @@ async function compress(file, targetBytes) {
       blob = await canvasBlob(bitmap, side, quality);
       if (blob && blob.size <= targetBytes) break;
     }
-    if (!blob) throw new Error('Could not prepare screenshot for upload.');
-    if (blob.size > targetBytes) throw new Error('A screenshot is too detailed to fit the upload limit. Crop unnecessary browser chrome and try again.');
+    if (!blob) throw new Error('Could not prepare screenshot for analysis.');
+    if (blob.size > targetBytes) throw new Error('A screenshot is too detailed to fit the safe request limit. Crop unnecessary browser chrome and try again.');
     return { dataUrl: await blobToDataURL(blob), bytes: blob.size };
   } finally { bitmap.close?.(); }
 }
@@ -102,12 +127,13 @@ function renderResult(data) {
   const actionable = r.decision === 'LONG' || r.decision === 'SHORT';
   const numbers = actionable ? `<div class="numbers"><div class="number"><small>ENTRY</small><b>${money(r.entry)}</b></div><div class="number"><small>STOP</small><b>${money(r.stop)}</b></div><div class="number"><small>TAKE PROFIT</small><b>${money(r.target)}</b></div><div class="number"><small>R:R</small><b>${Number(r.rr).toFixed(2)}</b></div></div>` : '';
   const stages = data.meta?.stages || {};
-  els.result.innerHTML = `<div class="result-head"><div><h2 class="decision ${decisionClass}">${esc(r.decision === 'WAIT' ? 'Wait.' : r.decision === 'LONG' ? 'Long.' : 'Short.')}</h2><p class="setup">${esc(r.setupId)} · ${esc(r.setup)}</p></div><span class="confidence">${Math.round(r.confidence || 0)}% evidence</span></div>${numbers}<div class="grid"><div class="tile"><small>Instrument</small><b>${esc(r.instrument)}</b></div><div class="tile"><small>Bias</small><b>${esc(r.bias)}</b></div><div class="tile"><small>Draw on liquidity</small><b>${esc(r.dol)}${r.dolPrice ? ` · ${money(r.dolPrice)}` : ''}</b></div><div class="tile"><small>Execution chart</small><b>${esc(r.executionLabel || 'None')}</b></div></div>${r.reason ? `<p class="error"><b>Why WAIT:</b> ${esc(r.reason)}</p>` : ''}${r.trigger ? `<h3>Entry trigger</h3><p>${esc(r.trigger)}</p>` : ''}${r.invalidation ? `<h3>Invalidation</h3><p>${esc(r.invalidation)}</p>` : ''}${r.sessionContext ? `<h3>Session context</h3><p>${esc(r.sessionContext)}</p>` : ''}<h3>Why this decision</h3>${list(r.evidence)}<h3>Uncertainty</h3>${list(r.uncertainty)}<p class="hint">Native engine ${esc(data.meta?.backendVersion || '')} · ${(data.meta.processingMs/1000).toFixed(1)}s total · vision ${((stages.nativeVisionMs || 0)/1000).toFixed(1)}s · local OCR ${((stages.groundingMs || 0)/1000).toFixed(1)}s · no external model API.</p>`;
+  const lifecycle = r.lifecycle?.state || r.strategyLifecycle?.state || '';
+  els.result.innerHTML = `<div class="result-head"><div><h2 class="decision ${decisionClass}">${esc(r.decision === 'WAIT' ? 'Wait.' : r.decision === 'LONG' ? 'Long.' : 'Short.')}</h2><p class="setup">${esc(r.setupId)} · ${esc(r.setup)}</p></div><span class="confidence">${Math.round(r.confidence || 0)}% evidence</span></div>${lifecycle ? `<p class="hint"><b>Lifecycle:</b> ${esc(lifecycle)}</p>` : ''}${numbers}<div class="grid"><div class="tile"><small>Instrument</small><b>${esc(r.instrument)}</b></div><div class="tile"><small>Bias</small><b>${esc(r.bias)}</b></div><div class="tile"><small>Draw on liquidity</small><b>${esc(r.dol)}${r.dolPrice ? ` · ${money(r.dolPrice)}` : ''}</b></div><div class="tile"><small>Execution chart</small><b>${esc(r.executionLabel || 'None')}</b></div></div>${r.reason ? `<p class="error"><b>Why WAIT:</b> ${esc(r.reason)}</p>` : ''}${r.trigger ? `<h3>Entry trigger</h3><p>${esc(r.trigger)}</p>` : ''}${r.invalidation ? `<h3>Invalidation</h3><p>${esc(r.invalidation)}</p>` : ''}${r.sessionContext ? `<h3>Session context</h3><p>${esc(r.sessionContext)}</p>` : ''}<h3>Why this decision</h3>${list(r.evidence)}<h3>Uncertainty</h3>${list(r.uncertainty)}<p class="hint">Local native engine ${esc(data.meta?.backendVersion || '')} · ${Number.isFinite(Number(data.meta?.processingMs)) ? `${(data.meta.processingMs/1000).toFixed(1)}s total · ` : ''}vision ${((stages.nativeVisionMs || 0)/1000).toFixed(1)}s · grounding ${((stages.groundingMs || 0)/1000).toFixed(1)}s · no external model API.</p>`;
   els.result.hidden = false;
   els.result.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function renderError(message) {
-  els.result.innerHTML = `<h2 class="decision wait">Couldn’t analyze.</h2><p class="error">${esc(message)}</p><p class="hint">No trade was produced. Nothing is inferred when the native backend fails.</p>`;
+  els.result.innerHTML = `<h2 class="decision wait">Couldn’t analyze.</h2><p class="error">${esc(message)}</p><p class="hint">No trade was produced. Nothing is inferred when the local native engine fails.</p>`;
   els.result.hidden = false;
 }
 
@@ -127,19 +153,18 @@ els.analyze.addEventListener('click', async () => {
     }
     if (total > MAX_TOTAL_BINARY_BYTES) throw new Error('The screenshots exceed the safe request limit after compression. Crop unnecessary browser chrome and try again.');
 
-    els.progressText.textContent = 'Native engine is reconstructing candles; local OCR runs only if a setup qualifies…';
+    els.progressText.textContent = 'Local engine is reconstructing the market state…';
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 70_000);
-    const headers = { 'Content-Type':'application/json' };
-    const key = els.accessKey.value.trim();
-    if (key) headers['x-ictbrain-key'] = key;
-    const response = await fetch('/api/analyze', { method:'POST', headers, signal: controller.signal, body: JSON.stringify({ screenshots }) });
+    const timer = setTimeout(() => controller.abort(), 75_000);
+    const response = await fetch(`${backendBase()}/analyze`, {
+      method:'POST', headers: authHeaders(true), signal: controller.signal, body: JSON.stringify({ screenshots, client: 'github-pages-ui' })
+    });
     clearTimeout(timer);
-    const payload = await response.json().catch(()=>({ ok:false, error:`Backend returned HTTP ${response.status}.` }));
-    if (!response.ok || !payload.ok) throw new Error(payload.error || `Backend returned HTTP ${response.status}.`);
+    const payload = await response.json().catch(()=>({ ok:false, error:`Local engine returned HTTP ${response.status}.` }));
+    if (!response.ok || !payload.ok) throw new Error(payload.error || `Local engine returned HTTP ${response.status}.`);
     renderResult(payload);
   } catch (error) {
-    renderError(error?.name === 'AbortError' ? 'The native analysis exceeded 70 seconds and was cancelled safely.' : (error?.message || 'Analysis failed.'));
+    renderError(error?.name === 'AbortError' ? 'The local analysis exceeded 75 seconds and was cancelled safely.' : (error?.message || 'Analysis failed.'));
   } finally { setBusy(false); }
 });
 
