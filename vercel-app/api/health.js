@@ -1,7 +1,7 @@
 import { supportedNativeSetups } from '../lib/native-engine.js';
 import { strategyKnowledgeSummary } from '../lib/strategy-architect.js';
 
-const VERSION = '5.0.0';
+const VERSION = '6.0.0';
 
 export default function handler(req, res) {
   const knowledge = strategyKnowledgeSummary();
@@ -12,9 +12,11 @@ export default function handler(req, res) {
     ok: true,
     service: 'ICT Brain native backend',
     version: VERSION,
-    engine: 'native-deterministic-v4.2+strategy-architect-v5',
-    strategyCreator: 'deterministic-strategy-architect-v5',
+    engine: 'native-perception-v4.2+market-model-v6+strategy-architect-v6',
+    strategyCreator: 'primitive-market-graph-strategy-creator-v6',
     strategyCreatorOwnsSelection: true,
+    namedDetectorIndependent: true,
+    adversarialCritic: true,
     strategyKnowledgeVersion: knowledge.version,
     knowledgeDomains: knowledge.knowledgeDomains,
     externalInference: false,
@@ -27,8 +29,9 @@ export default function handler(req, res) {
     ocrNumericWhitelist: true,
     ocrSplitLabelReassembly: true,
     ocrHighResolutionSource: true,
-    sourceDetectors: supportedNativeSetups(),
-    blockedUntilNativeAlignmentIsCertified: ['S02', 'S03', 'S04', 'S08', 'S10'],
+    legacyPerceptionDetectorsOnly: supportedNativeSetups(),
+    creatorDoesNotConsumeDetectorIds: true,
+    blockedUntilNativeAlignmentIsCertified: ['timestamp/session-window logic', 'NQ↔ES synchronized SMT'],
     maxScreenshots: 4,
     oneTradeOnly: true,
     failClosed: true,
