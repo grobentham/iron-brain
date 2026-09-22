@@ -101,8 +101,7 @@ function classifyAxisText(text) {
 }
 
 function collectAxisText(bounds) {
-  const labels = [];
-  const seen = new Set();
+  const labels = [], seen = new Set();
   const candidates = document.querySelectorAll('span,div,button,[role="button"],[aria-label],[title]');
   for (const el of candidates) {
     if (!isVisibleElement(el)) continue;
@@ -111,8 +110,7 @@ function collectAxisText(bounds) {
     const raw = (el.textContent || el.getAttribute('aria-label') || el.getAttribute('title') || '').trim();
     const kind = classifyAxisText(raw);
     if (!kind) continue;
-    const x = (rect.left + rect.right) / 2;
-    const y = (rect.top + rect.bottom) / 2;
+    const x = (rect.left + rect.right) / 2, y = (rect.top + rect.bottom) / 2;
     const nearBottom = y >= bounds.bottom - Math.max(85, (bounds.bottom - bounds.top) * .16);
     const nearRight = x >= bounds.right - Math.max(130, (bounds.right - bounds.left) * .15);
     if ((kind === 'time' || kind === 'date' || kind === 'timezone') && !nearBottom) continue;
@@ -135,11 +133,18 @@ function drawDomAxisLabels(ctx, labels, width, height) {
   ctx.save();
   ctx.font = `${Math.max(12, Math.round(height * .013))}px Arial, sans-serif`;
   ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(215,220,228,.96)';
   for (const label of labels) {
-    const x = label.xPermille / 1000 * width;
+    let x = label.xPermille / 1000 * width;
     const y = label.yPermille / 1000 * height;
-    ctx.fillStyle = 'rgba(215,220,228,.96)';
-    ctx.fillText(label.text, x, y);
+    if (label.kind === 'price') {
+      ctx.textAlign = 'right';
+      x = Math.min(width - 4, Math.max(80, x));
+    } else {
+      ctx.textAlign = 'center';
+      x = Math.min(width - 25, Math.max(25, x));
+    }
+    ctx.fillText(label.text, x, Math.min(height - 8, Math.max(8, y)));
   }
   ctx.restore();
 }
