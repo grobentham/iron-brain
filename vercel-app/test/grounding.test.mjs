@@ -26,11 +26,11 @@ test('refuses weak price calibration', () => {
   assert.equal(c.strong, false);
 });
 
-test('rejects OCR prices that are not aligned to the 0.25 futures tick', () => {
+test('rejects non-quarter-tick OCR prices and very low confidence noise', () => {
   const hocr = `
     <span class='ocrx_word' title='bbox 0 100 90 130; x_wconf 95'>21040.13</span>
     <span class='ocrx_word' title='bbox 0 200 90 230; x_wconf 95'>21020.25</span>
-    <span class='ocrx_word' title='bbox 0 300 90 330; x_wconf 20'>21000.00</span>
+    <span class='ocrx_word' title='bbox 0 300 90 330; x_wconf 5'>21000.00</span>
   `;
   const samples = parseHocrPriceSamples(hocr, 1000);
   assert.equal(samples.length, 1);
@@ -48,6 +48,18 @@ test('reassembles split TradingView price labels on the same OCR row', () => {
   const samples = parseHocrPriceSamples(hocr, 1000);
   assert.equal(samples.some(x => x.price === 21040.25), true);
   assert.equal(samples.some(x => x.price === 21020), true);
+});
+
+test('accepts moderate-confidence numeric labels when their scale is consistent', () => {
+  const hocr = `
+    <span class='ocrx_word' title='bbox 0 100 90 130; x_wconf 18'>21040.00</span>
+    <span class='ocrx_word' title='bbox 0 300 90 330; x_wconf 24'>21020.00</span>
+    <span class='ocrx_word' title='bbox 0 500 90 530; x_wconf 28'>21000.00</span>
+  `;
+  const samples = parseHocrPriceSamples(hocr, 1000);
+  const c = calibratePriceAxis(samples);
+  assert.equal(samples.length, 3);
+  assert.equal(c.strong, true);
 });
 
 test('refuses excessive price extrapolation beyond visible labels', () => {
