@@ -1,12 +1,14 @@
 import { supportedNativeSetups } from '../lib/native-engine.js';
 import { strategyKnowledgeSummary } from '../lib/strategy-architect.js';
 import { timeAxisKnowledgeSummary } from '../lib/time-axis-v6.js';
+import { crossMarketKnowledgeSummary } from '../lib/cross-market-v6.js';
 
-const VERSION = '6.1.0';
+const VERSION = '6.3.0';
 
 export default function handler(req, res) {
   const knowledge = strategyKnowledgeSummary();
   const timeAxis = timeAxisKnowledgeSummary();
+  const crossMarket = crossMarketKnowledgeSummary();
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -14,11 +16,15 @@ export default function handler(req, res) {
     ok: true,
     service: 'ICT Brain native backend',
     version: VERSION,
-    engine: 'native-deterministic-v4.2+time-axis-v6.1+market-model-v6+strategy-architect-v6',
-    strategyCreator: 'primitive-market-graph-strategy-creator-v6',
+    engine: 'native-deterministic-v4.2+time-axis-v6.1+synchronized-smt-v6.3+unified-mtf-market-model-v6.3+strategy-architect-v6.3',
+    strategyCreator: 'unified-mtf-market-graph-strategy-creator-v6.3',
     strategyCreatorOwnsSelection: true,
     namedDetectorIndependent: true,
     adversarialCritic: true,
+    synchronizedSMT: true,
+    synchronizedSMTKnowledge: crossMarket,
+    unifiedMultiTimeframeGraph: true,
+    rankedDOLEngine: true,
     strategyKnowledgeVersion: knowledge.version,
     timeAxisKnowledgeVersion: timeAxis.version,
     nativeTimeAxis: true,
@@ -38,7 +44,7 @@ export default function handler(req, res) {
     ocrHighResolutionSource: true,
     legacyPerceptionDetectorsOnly: supportedNativeSetups(),
     creatorDoesNotConsumeDetectorIds: true,
-    blockedUntilNativeAlignmentIsCertified: ['Eastern session-window logic when timezone is not explicit', 'NQ↔ES synchronized SMT'],
+    blockedUntilNativeAlignmentIsCertified: ['Eastern session-window logic when timezone is not explicit'],
     maxScreenshots: 4,
     oneTradeOnly: true,
     failClosed: true,
