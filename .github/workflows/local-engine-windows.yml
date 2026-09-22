@@ -8,6 +8,12 @@ on:
       - 'vercel-app/**'
       - 'package.json'
       - '.github/workflows/local-engine-windows.yml'
+  pull_request:
+    paths:
+      - 'local-engine/**'
+      - 'vercel-app/**'
+      - 'package.json'
+      - '.github/workflows/local-engine-windows.yml'
   workflow_dispatch:
 
 permissions:
@@ -33,6 +39,7 @@ jobs:
         shell: powershell
         run: |
           node --check local-engine/server.mjs
+          node --check local-engine/smoke-test.mjs
           node --check vercel-app/api/analyze-v64.js
           node --check vercel-app/lib/strategy-lifecycle-v6.js
           if (Select-String -Path local-engine/server.mjs -Pattern "0.0.0.0") { throw 'Local engine must not bind to all interfaces.' }
@@ -40,7 +47,12 @@ jobs:
           Select-String -Path local-engine/server.mjs -Pattern "Access-Control-Allow-Private-Network"
           Select-String -Path local-engine/server.mjs -Pattern "grobentham.github.io"
 
+      - name: Smoke test loopback server and browser CORS
+        shell: powershell
+        run: node local-engine/smoke-test.mjs
+
       - name: Assemble portable Windows bundle
+        if: github.event_name != 'pull_request'
         shell: powershell
         run: |
           $bundle = Join-Path $PWD 'dist\ICTBrain-LocalEngine-v6.4'
@@ -54,6 +66,7 @@ jobs:
           Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath (Join-Path $PWD 'ICTBrain-LocalEngine-v6.4.zip') -CompressionLevel Optimal -Force
 
       - name: Upload portable Windows engine
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: ICTBrain-LocalEngine-v6.4-Windows-x64
