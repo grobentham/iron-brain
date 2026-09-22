@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f4f1e9" />
-  <title>ICT Brain — Native One Trade</title>
-  <meta name="description" content="GitHub-hosted ICT Brain interface for deterministic local chart analysis. No external model API. One fixed trade or WAIT." />
+  <title>ICT Brain — Live Native Trade Engine</title>
+  <meta name="description" content="Hosted deterministic ICT chart analysis with TradingView Live Bridge. No external model API. One fixed trade or WAIT." />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -13,46 +13,60 @@
     <header class="topbar">
       <div class="brandmark">IB</div>
       <div class="brand">ICT BRAIN</div>
-      <div id="backendStatus" class="pill">Checking local engine…</div>
+      <div id="backendStatus" class="pill">Checking hosted engine…</div>
     </header>
 
     <section class="hero">
-      <p class="eyebrow">GITHUB PAGES UI · LOCAL ENGINE · NO MODEL API · ONE TRADE</p>
-      <h1>See the chart.<br>Reconstruct the setup.</h1>
-      <p class="lede">The website is a static interface hosted by GitHub Pages. Analysis runs in your own ICT Brain engine on this PC. After the one-time Windows install, the engine starts automatically when you sign in and the webpage connects to it directly.</p>
+      <p class="eyebrow">HOSTED NATIVE ENGINE · LIVE TRADINGVIEW BRIDGE · NO MODEL API</p>
+      <h1>Open TradingView.<br>ICT Brain watches.</h1>
+      <p class="lede">Keep TradingView and ICT Brain open. Live Bridge captures your authorized charts, the website backend reconstructs and evaluates the market, and this dashboard updates with one LONG, SHORT, or WAIT decision.</p>
     </section>
 
     <section class="block">
-      <div class="heading"><div><span>01</span><h2>Your charts</h2></div><strong id="count">0 / 4</strong></div>
-      <label class="drop" for="files"><b>Add screenshots</b><small>PNG, JPG or WEBP · up to four in manual upload mode</small></label>
+      <div class="heading"><div><span>01</span><h2>Live TradingView</h2></div><strong id="connectedCount">0 / 5</strong></div>
+      <div class="live-grid">
+        <div class="tile"><small>Live Bridge</small><b id="bridgeStatus">Checking extension…</b></div>
+        <div class="tile"><small>Lifecycle</small><b id="lifecycleState">WATCHING</b></div>
+        <div class="tile"><small>Last scan</small><b id="lastScan">Never</b></div>
+        <div class="tile"><small>Live Scan</small><b id="monitorState">OFF</b></div>
+      </div>
+      <p id="liveError" class="error"></p>
+      <div class="live-actions">
+        <button id="scanLive" class="primary" disabled>Scan TradingView now</button>
+        <label class="monitor-control"><input id="liveToggle" type="checkbox" disabled> <span>Analyze automatically when connected charts change</span></label>
+      </div>
+      <p class="hint">Recommended stack: <b>NQ 1H → NQ 15m → MNQ 5m → MNQ 1m → ES 1m</b>. Install Live Bridge once; after that the website receives its state automatically.</p>
+      <section id="liveResult" class="result compact-result" aria-live="polite">
+        <h2 class="decision wait">Wait.</h2>
+        <p class="setup">Waiting for Live Bridge and the first TradingView scan.</p>
+      </section>
+    </section>
+
+    <section class="block">
+      <div class="heading"><div><span>02</span><h2>Manual fallback</h2></div><strong id="count">0 / 4</strong></div>
+      <label class="drop" for="files"><b>Add screenshots</b><small>PNG, JPG or WEBP · up to four</small></label>
       <input id="files" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
-      <p class="hint">Recommended manual stack: <b>1H NQ → 15m NQ → 5m MNQ → 1m MNQ</b>. Live Bridge v1.2.1 handles the five-chart stack including ES 1m.</p>
+      <p class="hint">Manual upload remains available if Live Bridge is unavailable. Use <b>1H NQ → 15m NQ → 5m MNQ → 1m MNQ</b> and keep the right-side price scale visible.</p>
       <div id="shots" class="shots"></div>
+      <div class="action manual-action">
+        <button id="analyze" class="primary" disabled>Analyze uploaded charts</button>
+        <div id="progress" class="progress" hidden><span class="spinner"></span><span id="progressText">Preparing charts…</span></div>
+      </div>
+      <section id="result" class="result" hidden aria-live="polite"></section>
     </section>
 
     <section class="block">
-      <div class="heading"><div><span>02</span><h2>Native analysis rules</h2></div></div>
-      <p class="hint"><b>No ChatGPT, Gemini, Claude, AI Gateway, or external inference API is used.</b> The GitHub-hosted page contains only the UI. Candle reconstruction, time/price grounding, synchronized SMT, multi-timeframe market modeling, DOL ranking, strategy creation, critic checks and lifecycle processing belong to the local ICT Brain engine.</p>
-      <details class="access" open>
-        <summary>Local engine connection</summary>
-        <label for="backendUrl">Engine URL</label>
-        <input id="backendUrl" type="url" value="http://127.0.0.1:8787" autocomplete="off" spellcheck="false">
-        <p class="hint">Default: <b>http://127.0.0.1:8787</b>. The engine listens only on your own computer. Modern Chromium browsers may ask once for permission to let this GitHub Pages site access the loopback service; approve that prompt for ICT Brain to connect.</p>
-        <label for="accessKey">Optional access key</label>
-        <input id="accessKey" type="password" autocomplete="off" placeholder="Leave blank for the normal local engine">
-        <p class="hint">Connection settings are stored only in this browser.</p>
+      <div class="heading"><div><span>03</span><h2>Native analysis contract</h2></div></div>
+      <p class="hint"><b>No ChatGPT, Gemini, Claude, AI Gateway, or external inference API is used.</b> The hosted backend executes ICT Brain's own deterministic candle reconstruction, price/time grounding, synchronized NQ↔ES analysis, multi-timeframe market graph, DOL ranking, Strategy Architect, critic and lifecycle code.</p>
+      <details class="access">
+        <summary>Private access key</summary>
+        <input id="accessKey" type="password" autocomplete="off" placeholder="Only needed if private backend access is enabled">
+        <p class="hint">Stored only in this browser. The normal public deployment can leave this blank.</p>
       </details>
     </section>
 
-    <section class="block action">
-      <button id="analyze" class="primary" disabled>Run native analysis</button>
-      <div id="progress" class="progress" hidden><span class="spinner"></span><span id="progressText">Preparing charts…</span></div>
-    </section>
-
-    <section id="result" class="result" hidden aria-live="polite"></section>
-
     <footer>
-      <p><b>Privacy:</b> GitHub Pages serves only the static website files. When using the default local engine URL, screenshots are sent to the ICT Brain process running on your own PC. The local engine binds to loopback only, not your LAN. No broker orders are placed.</p>
+      <p><b>Workflow:</b> TradingView → Live Bridge → ICT Brain website backend → this dashboard. Screenshots are processed in memory and are not intentionally stored by ICT Brain. No broker orders are placed.</p>
       <p class="hint">Research support only. Confidence is deterministic evidence quality, not win probability.</p>
     </footer>
   </main>
