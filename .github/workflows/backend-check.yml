@@ -44,22 +44,27 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Syntax checks
         run: npm run check
-      - name: Native engine, market model, grounding, and architect tests
+      - name: Native engine, time axis, market model, grounding, and architect tests
         run: npm test
-      - name: Native-only v6 strategy-creator invariants
+      - name: Native-only v6.1 invariants
         run: |
-          grep -q "BACKEND_VERSION = '6.0.0'" api/analyze.js
+          grep -q "BACKEND_VERSION = '6.1.0'" api/analyze.js
           grep -q "externalInference: false" api/analyze.js
+          grep -q "time-axis-v6.1" api/analyze.js
+          grep -q "attachNativeTimeAxis" api/analyze.js
+          grep -q "calibrateTimeAxis" lib/time-axis-v6.js
+          grep -q "validatesCandleSpacingAgainstDeclaredTimeframe" lib/time-axis-v6.js
+          grep -q "easternSessionLogicRequiresExplicitTimezone" lib/time-axis-v6.js
           grep -q "market-model-v6" api/analyze.js
           grep -q "strategy-architect-v6" api/analyze.js
           grep -q "architectStrategy" api/analyze.js
-          grep -q "strategyKnowledgeSummary" api/analyze.js
           grep -q "primitive-market-graph-strategy-creator" lib/strategy-architect.js
           grep -q "namedDetectorIndependent:true" lib/strategy-architect.js
           grep -q "Adversarial critic passed" lib/strategy-architect.js
           grep -q "buildMarketModel" lib/market-model-v6.js
           grep -q "named setup IDs are not inputs to the creator" lib/market-model-v6.js
           grep -q "ARCH6-" lib/strategy-architect.js
+          test -s test/time-axis-v6.test.mjs
           if grep -E "SOURCE_FACTS|setupId: 'S0|setupId: \"S0" lib/strategy-architect.js lib/market-model-v6.js; then
             echo 'Named setup IDs leaked into Strategy Architect v6 decision path'
             exit 1
@@ -68,9 +73,6 @@ jobs:
           grep -q "langPath: ENG_DATA.langPath" api/analyze.js
           grep -q "tessedit_char_whitelist" api/analyze.js
           grep -q "ocrBuffer" api/analyze.js
-          grep -q "leftFraction: 0.82" api/analyze.js
-          grep -q "leftFraction: 0.78" api/analyze.js
-          grep -q "leftFraction: 0.86" api/analyze.js
           grep -q "PRICE_FIND_RE" lib/grounding.js
           if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" \
             --exclude='*.md' --exclude-dir=node_modules .; then
@@ -106,9 +108,10 @@ jobs:
           test -s vercel-app/api/strategy-knowledge.js
           test -s vercel-app/lib/grounding.js
           test -s vercel-app/lib/native-engine.js
+          test -s vercel-app/lib/time-axis-v6.js
           test -s vercel-app/lib/market-model-v6.js
           test -s vercel-app/lib/strategy-architect.js
-          grep -q '"version": "6.0.0"' package.json
+          grep -q '"version": "6.1.0"' package.json
           grep -q "NO MODEL API" index.html
           grep -q "Run native analysis" index.html
           grep -q "externalInference === false" app.js
@@ -123,7 +126,7 @@ jobs:
           if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" \
             --exclude='*.md' --exclude-dir=node_modules --exclude-dir=.git \
             api vercel-app index.html app.js package.json vercel.json; then
-            echo 'External inference reference found in deployable v6 source'
+            echo 'External inference reference found in deployable v6.1 source'
             exit 1
           fi
           if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' \
@@ -140,7 +143,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate extension files and JavaScript
+      - name: Validate Live Bridge v1.1
         run: |
           test -s live-bridge/manifest.json
           test -s live-bridge/content-script.js
@@ -154,12 +157,22 @@ jobs:
           node --check live-bridge/service-worker.js
           node --check live-bridge/popup.js
           grep -q '"manifest_version": 3' live-bridge/manifest.json
+          grep -q '"version": "1.1.0"' live-bridge/manifest.json
           grep -q 'https://www.tradingview.com/\*' live-bridge/manifest.json
           grep -q 'https://iron-brain.vercel.app/\*' live-bridge/manifest.json
           grep -q 'MAX_CONNECTED_TABS = 4' live-bridge/service-worker.js
           grep -q 'MIN_INTERVAL_SEC = 30' live-bridge/service-worker.js
+          grep -q 'rememberedCharts' live-bridge/service-worker.js
+          grep -q 'captureFingerprints' live-bridge/service-worker.js
+          grep -q 'unchangedSkips' live-bridge/service-worker.js
+          grep -q 'marketJournal' live-bridge/service-worker.js
+          grep -q 'reconnectRememberedTabs' live-bridge/service-worker.js
           grep -q 'ICT_CAPTURE_CHART' live-bridge/content-script.js
-          grep -q 'dom-canvas-composite' live-bridge/content-script.js
+          grep -q 'canvas+dom-axis-composite' live-bridge/content-script.js
+          grep -q 'timeHints' live-bridge/content-script.js
+          grep -q 'timezoneHint' live-bridge/content-script.js
+          grep -q 'fingerprint' live-bridge/content-script.js
+          grep -q 'Only calls the backend when a connected chart actually changes' live-bridge/popup.html
           grep -q 'No broker orders. No external model API.' live-bridge/popup.html
       - name: Ensure bridge contains no external AI/model calls or committed secrets
         run: |
