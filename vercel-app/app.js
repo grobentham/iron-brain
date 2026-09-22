@@ -1,5 +1,7 @@
 const MAX_IMAGES = 4;
 const MAX_SIDE = 1600;
+const TARGET_IMAGE_BYTES = 700_000;
+const MAX_TOTAL_BINARY_BYTES = 2_800_000;
 const INSTRUMENTS = ['AUTO','NQ','MNQ','ES'];
 const TIMEFRAMES = ['AUTO','1m','3m','5m','15m','30m','1H','4H','1D'];
 
@@ -63,23 +65,37 @@ async function blobToDataURL(blob) {
   return new Promise((resolve,reject) => { const r = new FileReader(); r.onload=()=>resolve(r.result); r.onerror=reject; r.readAsDataURL(blob); });
 }
 
-async function compress(file) {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+async function canvasBlob(bitmap, maxSide, quality) {
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(bitmap.width * scale));
   canvas.height = Math.max(1, Math.round(bitmap.height * scale));
   const ctx = canvas.getContext('2d', { alpha: false });
-  ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
-  bitmap.close?.();
-  let quality = .86;
-  let blob;
-  do {
-    blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
-    quality -= .08;
-  } while (blob && blob.size > 850_000 && quality >= .62);
-  if (!blob) throw new Error('Could not prepare screenshot for upload.');
-  return { dataUrl: await blobToDataURL(blob), bytes: blob.size };
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+}
+
+async function compress(file) {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const attempts = [
+      [MAX_SIDE,.88],[MAX_SIDE,.80],[1500,.76],[1450,.72],[1350,.70],[1250,.68],[1200,.64]
+    ];
+    let blob = null;
+    for (const [side, quality] of attempts) {
+      blob = await canvasBlob(bitmap, side, quality);
+      if (blob && blob.size <= TARGET_IMAGE_BYTES) break;
+    }
+    if (!blob) throw new Error('Could not prepare screenshot for upload.');
+    if (blob.size > TARGET_IMAGE_BYTES) throw new Error('A screenshot is too detailed to fit the secure upload limit. Crop unnecessary browser chrome and try again.');
+    return { dataUrl: await blobToDataURL(blob), bytes: blob.size };
+  } finally {
+    bitmap.close?.();
+  }
 }
 
 function list(items) {
@@ -115,11 +131,11 @@ els.analyze.addEventListener('click', async () => {
       total += compressed.bytes;
       screenshots.push({ dataUrl: compressed.dataUrl, instrument: state.shots[i].instrument, timeframe: state.shots[i].timeframe });
     }
-    if (total > 3_500_000) throw new Error('The four screenshots are still too large. Crop unnecessary browser chrome and try again.');
+    if (total > MAX_TOTAL_BINARY_BYTES) throw new Error('The screenshots exceed the safe Vercel request limit after compression. Crop unnecessary browser chrome and try again.');
 
     els.progressText.textContent = 'Backend is reading price scales and ICT structure…';
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 70_000);
+    const timer = setTimeout(() => controller.abort(), 120_000);
     const headers = { 'Content-Type':'application/json' };
     const key = els.accessKey.value.trim();
     if (key) headers['x-ictbrain-key'] = key;
@@ -132,7 +148,7 @@ els.analyze.addEventListener('click', async () => {
     if (!response.ok || !payload.ok) throw new Error(payload.error || `Backend returned HTTP ${response.status}.`);
     renderResult(payload);
   } catch (error) {
-    renderError(error?.name === 'AbortError' ? 'The analysis exceeded 70 seconds and was cancelled safely.' : (error?.message || 'Analysis failed.'));
+    renderError(error?.name === 'AbortError' ? 'The analysis exceeded two minutes and was cancelled safely.' : (error?.message || 'Analysis failed.'));
   } finally {
     setBusy(false);
   }
