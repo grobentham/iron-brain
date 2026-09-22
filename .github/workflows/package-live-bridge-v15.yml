@@ -1,0 +1,36 @@
+name: Package ICT Brain Live Bridge v1.5
+
+on:
+  pull_request:
+    paths:
+      - 'live-bridge/**'
+      - '.github/workflows/package-live-bridge-v15.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create extension zip
+        run: |
+          mkdir -p dist/ICT-Brain-Live-Bridge-v1.5
+          cp live-bridge/manifest.json dist/ICT-Brain-Live-Bridge-v1.5/
+          cp live-bridge/content-script.js dist/ICT-Brain-Live-Bridge-v1.5/
+          cp live-bridge/service-worker-browser.js dist/ICT-Brain-Live-Bridge-v1.5/
+          cp live-bridge/page-bridge.js dist/ICT-Brain-Live-Bridge-v1.5/
+          cp live-bridge/popup.html dist/ICT-Brain-Live-Bridge-v1.5/
+          cp live-bridge/popup-v15.js dist/ICT-Brain-Live-Bridge-v1.5/
+          cp live-bridge/popup.css dist/ICT-Brain-Live-Bridge-v1.5/
+          cp live-bridge/icon.svg dist/ICT-Brain-Live-Bridge-v1.5/
+          cd dist
+          zip -r ICT-Brain-Live-Bridge-v1.5.zip ICT-Brain-Live-Bridge-v1.5
+      - name: Upload extension zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ICT-Brain-Live-Bridge-v1.5
+          path: dist/ICT-Brain-Live-Bridge-v1.5.zip
+          retention-days: 7
