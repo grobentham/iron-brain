@@ -1,21 +1,19 @@
 {
   "manifest_version": 3,
   "name": "ICT Brain Live Bridge",
-  "version": "1.3.0",
-  "description": "Five-chart TradingView monitoring connected directly to the hosted deterministic ICT Brain web app.",
+  "version": "1.4.0",
+  "description": "TradingView bridge for the browser-native ICT Brain website. No hosted backend, localhost service, or external model API.",
   "permissions": [
     "storage",
     "tabs",
-    "alarms",
-    "notifications",
     "scripting"
   ],
   "host_permissions": [
     "https://www.tradingview.com/*",
-    "https://iron-brain.vercel.app/*"
+    "https://grobentham.github.io/iron-brain/*"
   ],
   "background": {
-    "service_worker": "service-worker-hosted.js",
+    "service_worker": "service-worker-browser.js",
     "type": "module"
   },
   "action": {
@@ -29,8 +27,8 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://iron-brain.vercel.app/*"],
-      "js": ["dashboard-bridge.js"],
+      "matches": ["https://grobentham.github.io/iron-brain/*"],
+      "js": ["page-bridge.js"],
       "run_at": "document_idle"
     }
   ]
