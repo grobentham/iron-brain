@@ -55,6 +55,8 @@ jobs:
           grep -q 'NO SERVER BACKEND' index.html
           grep -q "analyzeInBrowser" app.js
           grep -q "browserEngineHealth" app.js
+          grep -q "scheduleLive" app.js
+          grep -q "setTimeout(async()=>{state.timer=null;await runLiveScan(false)" app.js
           grep -q "Canvas/ImageData" index.html
           grep -q "buildSynchronizedSMT" vercel-app/lib/cross-market-v6.js
           grep -q "buildUnifiedGraph" vercel-app/lib/market-model-v6.js
@@ -76,21 +78,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate Live Bridge v1.4 browser handoff
+      - name: Validate Live Bridge v1.5 browser handoff
         run: |
           node -e "JSON.parse(require('fs').readFileSync('live-bridge/manifest.json','utf8'))"
           node --check live-bridge/content-script.js
           node --check live-bridge/service-worker-browser.js
           node --check live-bridge/page-bridge.js
-          node --check live-bridge/popup-v14.js
-          grep -q '"version": "1.4.0"' live-bridge/manifest.json
+          node --check live-bridge/popup-v15.js
+          grep -q '"version": "1.5.0"' live-bridge/manifest.json
           grep -q '"service_worker": "service-worker-browser.js"' live-bridge/manifest.json
           grep -q 'https://grobentham.github.io/iron-brain/\*' live-bridge/manifest.json
           grep -q 'page-bridge.js' live-bridge/manifest.json
           grep -q 'ICT_CAPTURE_STACK' live-bridge/service-worker-browser.js
+          grep -q 'ICT_DETECT_TAB' live-bridge/service-worker-browser.js
+          grep -q 'liveInstrument' live-bridge/service-worker-browser.js
+          grep -q 'liveTimeframe' live-bridge/service-worker-browser.js
+          grep -q 'detectInstrumentDetailed' live-bridge/content-script.js
+          grep -q 'detectTimeframeDetailed' live-bridge/content-script.js
           grep -q 'ICT_EXTENSION_REQUEST' live-bridge/page-bridge.js
+          grep -q 'v1.5' live-bridge/popup.html
+          grep -q 'popup-v15.js' live-bridge/popup.html
+          grep -q 'Detected now:' live-bridge/popup-v15.js
           grep -q 'No Vercel. No localhost server.' live-bridge/popup.html
-          if grep -E 'iron-brain\.vercel\.app|127\.0\.0\.1:8787|localhost:8787' live-bridge/manifest.json live-bridge/service-worker-browser.js live-bridge/page-bridge.js live-bridge/popup.html live-bridge/popup-v14.js; then
-            echo 'Server dependency found in active Live Bridge v1.4 files'
+          if grep -E 'iron-brain\.vercel\.app|127\.0\.0\.1:8787|localhost:8787' live-bridge/manifest.json live-bridge/service-worker-browser.js live-bridge/page-bridge.js live-bridge/popup.html live-bridge/popup-v15.js; then
+            echo 'Server dependency found in active Live Bridge v1.5 files'
             exit 1
           fi
