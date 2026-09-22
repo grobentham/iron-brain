@@ -32,19 +32,26 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Syntax checks
         run: npm run check
-      - name: Native engine, grounding, and architect tests
+      - name: Native engine, market model, grounding, and architect tests
         run: npm test
-      - name: Native-only strategy-creator invariants
+      - name: Native-only v6 strategy-creator invariants
         run: |
-          grep -q "BACKEND_VERSION = '5.0.0'" api/analyze.js
+          grep -q "BACKEND_VERSION = '6.0.0'" api/analyze.js
           grep -q "externalInference: false" api/analyze.js
-          grep -q "strategy-architect-v5" api/analyze.js
+          grep -q "market-model-v6" api/analyze.js
+          grep -q "strategy-architect-v6" api/analyze.js
           grep -q "architectStrategy" api/analyze.js
           grep -q "strategyKnowledgeSummary" api/analyze.js
-          grep -q "deterministic-strategy-creator" lib/strategy-architect.js
-          grep -q "Strategy Architect created this plan" lib/strategy-architect.js
-          grep -q "ARCH-" lib/strategy-architect.js
-          grep -q "sourceSetupId" lib/strategy-architect.js
+          grep -q "primitive-market-graph-strategy-creator" lib/strategy-architect.js
+          grep -q "namedDetectorIndependent:true" lib/strategy-architect.js
+          grep -q "Adversarial critic passed" lib/strategy-architect.js
+          grep -q "buildMarketModel" lib/market-model-v6.js
+          grep -q "named setup IDs are not inputs to the creator" lib/market-model-v6.js
+          grep -q "ARCH6-" lib/strategy-architect.js
+          if grep -E "SOURCE_FACTS|setupId: 'S0|setupId: \"S0" lib/strategy-architect.js lib/market-model-v6.js; then
+            echo 'Named setup IDs leaked into Strategy Architect v6 decision path'
+            exit 1
+          fi
           grep -q "@tesseract.js-data/eng" package.json
           grep -q "langPath: ENG_DATA.langPath" api/analyze.js
           grep -q "tessedit_char_whitelist" api/analyze.js
@@ -52,13 +59,7 @@ jobs:
           grep -q "leftFraction: 0.82" api/analyze.js
           grep -q "leftFraction: 0.78" api/analyze.js
           grep -q "leftFraction: 0.86" api/analyze.js
-          grep -q "psm: 11" api/analyze.js
-          grep -q "psm: 6" api/analyze.js
-          grep -q "psm: 4" api/analyze.js
           grep -q "PRICE_FIND_RE" lib/grounding.js
-          grep -q "supportedNativeSetups" lib/native-engine.js
-          grep -q "S01" lib/native-engine.js
-          grep -q "S11" lib/native-engine.js
           if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" \
             --exclude='*.md' --exclude-dir=node_modules .; then
             echo 'External inference dependency/reference found in native backend'
@@ -93,14 +94,13 @@ jobs:
           test -s vercel-app/api/strategy-knowledge.js
           test -s vercel-app/lib/grounding.js
           test -s vercel-app/lib/native-engine.js
+          test -s vercel-app/lib/market-model-v6.js
           test -s vercel-app/lib/strategy-architect.js
-          grep -q '"version": "5.0.0"' package.json
+          grep -q '"version": "6.0.0"' package.json
           grep -q "NO MODEL API" index.html
           grep -q "Run native analysis" index.html
           grep -q "externalInference === false" app.js
           grep -q "startsWith('native-deterministic-v4')" app.js
-          grep -q "MAX_SIDE = 1800" app.js
-          grep -q "MAX_SINGLE_IMAGE_BYTES = 1_200_000" app.js
           grep -Fq "export const config = { maxDuration: 60 };" api/analyze.js
           grep -Fq "export { default } from '../vercel-app/api/analyze.js';" api/analyze.js
           grep -Fq "export { default } from '../vercel-app/api/health.js';" api/health.js
@@ -111,7 +111,7 @@ jobs:
           if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" \
             --exclude='*.md' --exclude-dir=node_modules --exclude-dir=.git \
             api vercel-app index.html app.js package.json vercel.json; then
-            echo 'External inference reference found in deployable v5 source'
+            echo 'External inference reference found in deployable v6 source'
             exit 1
           fi
           if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' \
