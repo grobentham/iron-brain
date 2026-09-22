@@ -1,6 +1,6 @@
 const MAX_IMAGES = 4;
-const MAX_SIDE = 1500;
-const TARGET_IMAGE_BYTES = 700_000;
+const MAX_SIDE = 1800;
+const MAX_SINGLE_IMAGE_BYTES = 1_200_000;
 const MAX_TOTAL_BINARY_BYTES = 2_800_000;
 const INSTRUMENTS = ['AUTO','NQ','MNQ','ES'];
 const TIMEFRAMES = ['AUTO','1m','3m','5m','15m','30m','1H','4H','1D'];
@@ -26,8 +26,9 @@ async function checkBackend() {
     const r = await fetch('/api/health', { cache: 'no-store' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
-    state.backendReady = Boolean(j.ok && j.externalInference === false && j.engine === 'native-deterministic-v4');
-    setStatus(state.backendReady ? 'Native backend ready' : 'Wrong backend version', state.backendReady ? 'ok' : 'bad');
+    const nativeV4 = String(j.engine || '').startsWith('native-deterministic-v4');
+    state.backendReady = Boolean(j.ok && j.externalInference === false && nativeV4);
+    setStatus(state.backendReady ? `Native backend ${j.version || ''} ready` : 'Wrong backend version', state.backendReady ? 'ok' : 'bad');
   } catch {
     state.backendReady = false;
     setStatus('Backend unavailable', 'bad');
@@ -72,17 +73,21 @@ async function canvasBlob(bitmap, maxSide, quality) {
   ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
   return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
 }
-async function compress(file) {
+function imageBudget() {
+  const count = Math.max(1, state.shots.length);
+  return Math.min(MAX_SINGLE_IMAGE_BYTES, Math.floor((MAX_TOTAL_BINARY_BYTES * 0.96) / count));
+}
+async function compress(file, targetBytes) {
   const bitmap = await createImageBitmap(file);
   try {
-    const attempts = [[MAX_SIDE,.86],[1450,.80],[1400,.76],[1350,.72],[1250,.68],[1150,.64]];
+    const attempts = [[MAX_SIDE,.92],[MAX_SIDE,.88],[1700,.86],[1650,.82],[1550,.78],[1450,.74],[1350,.70],[1250,.66]];
     let blob = null;
     for (const [side, quality] of attempts) {
       blob = await canvasBlob(bitmap, side, quality);
-      if (blob && blob.size <= TARGET_IMAGE_BYTES) break;
+      if (blob && blob.size <= targetBytes) break;
     }
     if (!blob) throw new Error('Could not prepare screenshot for upload.');
-    if (blob.size > TARGET_IMAGE_BYTES) throw new Error('A screenshot is too detailed to fit the upload limit. Crop unnecessary browser chrome and try again.');
+    if (blob.size > targetBytes) throw new Error('A screenshot is too detailed to fit the upload limit. Crop unnecessary browser chrome and try again.');
     return { dataUrl: await blobToDataURL(blob), bytes: blob.size };
   } finally { bitmap.close?.(); }
 }
@@ -113,15 +118,16 @@ els.analyze.addEventListener('click', async () => {
   try {
     const screenshots = [];
     let total = 0;
+    const targetBytes = imageBudget();
     for (let i=0;i<state.shots.length;i++) {
       els.progressText.textContent = `Preparing screenshot ${i+1} of ${state.shots.length}…`;
-      const compressed = await compress(state.shots[i].file);
+      const compressed = await compress(state.shots[i].file, targetBytes);
       total += compressed.bytes;
       screenshots.push({ dataUrl: compressed.dataUrl, instrument: state.shots[i].instrument, timeframe: state.shots[i].timeframe });
     }
     if (total > MAX_TOTAL_BINARY_BYTES) throw new Error('The screenshots exceed the safe request limit after compression. Crop unnecessary browser chrome and try again.');
 
-    els.progressText.textContent = 'Native engine is reconstructing candles and ICT structure…';
+    els.progressText.textContent = 'Native engine is reconstructing candles; local OCR runs only if a setup qualifies…';
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 70_000);
     const headers = { 'Content-Type':'application/json' };
