@@ -1,306 +1,193 @@
-const ARCHITECT_VERSION = '5.0.0';
+import { buildMarketModel, marketModelKnowledgeSummary, nearestTarget, priceLikeToPermille } from './market-model-v6.js';
 
-const FACTS = Object.freeze({
-  liquidity_raid: {
-    label: 'Liquidity raid',
-    meaning: 'Price trades through a prior swing liquidity level and returns through it.',
-    role: 'reversal-context',
-  },
-  false_breakout: {
-    label: 'False breakout reclaim',
-    meaning: 'A prior swing is violated but the move fails to hold outside the level.',
-    role: 'reversal-context',
-  },
-  structure_shift: {
-    label: 'Market structure shift',
-    meaning: 'Post-raid price closes through the relevant opposing internal swing.',
-    role: 'confirmation',
-  },
-  displacement: {
-    label: 'Displacement',
-    meaning: 'Directional range/body expansion confirms aggressive repricing.',
-    role: 'confirmation',
-  },
-  fvg: {
-    label: 'Fair value gap',
-    meaning: 'A three-candle imbalance exists near the active execution leg.',
-    role: 'entry-location',
-  },
-  breaker: {
-    label: 'Breaker retest',
-    meaning: 'A displaced break of a swing is followed by a hold on retest.',
-    role: 'entry-location',
-  },
-  rejection: {
-    label: 'Rejection',
-    meaning: 'A pronounced wick rejects a recently attacked liquidity level.',
-    role: 'confirmation',
-  },
-  htf_alignment: {
-    label: 'Higher-timeframe alignment',
-    meaning: 'Reconstructed higher-timeframe structure agrees with execution direction.',
-    role: 'context',
-  },
-  external_liquidity_target: {
-    label: 'External liquidity target',
-    meaning: 'The plan has a single opposing external swing/liquidity objective.',
-    role: 'target',
-  },
-  structural_invalidation: {
-    label: 'Structural invalidation',
-    meaning: 'The stop is beyond the thesis-defining structural extreme.',
-    role: 'risk',
-  },
-  fixed_single_trigger: {
-    label: 'Single trigger',
-    meaning: 'The strategy has exactly one execution condition and no alternate entry.',
-    role: 'execution',
-  },
-});
+const ARCHITECT_VERSION='6.0.0';
+const CREATOR_MODE='primitive-market-graph-strategy-creator';
 
-const SOURCE_FACTS = Object.freeze({
-  S01: ['liquidity_raid', 'displacement', 'fvg', 'external_liquidity_target', 'structural_invalidation', 'fixed_single_trigger'],
-  S05: ['breaker', 'displacement', 'external_liquidity_target', 'structural_invalidation', 'fixed_single_trigger'],
-  S06: ['htf_alignment', 'displacement', 'fvg', 'external_liquidity_target', 'structural_invalidation', 'fixed_single_trigger'],
-  S09: ['liquidity_raid', 'rejection', 'external_liquidity_target', 'structural_invalidation', 'fixed_single_trigger'],
-  S11: ['liquidity_raid', 'structure_shift', 'displacement', 'fvg', 'external_liquidity_target', 'structural_invalidation', 'fixed_single_trigger'],
-  S12: ['liquidity_raid', 'false_breakout', 'rejection', 'external_liquidity_target', 'structural_invalidation', 'fixed_single_trigger'],
-});
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+function uniq(a){return [...new Set(a.filter(Boolean))];}
+function latest(a,p=()=>true){return a.filter(p).at(-1)||null;}
+function visualRR(direction,entry,stop,target){
+  const risk=Math.abs(entry-stop), reward=Math.abs(target-entry);
+  if (!(risk>0&&reward>0)) return NaN;
+  const geometry=direction==='LONG'?stop<entry&&entry<target:target<entry&&entry<stop;
+  return geometry?reward/risk:NaN;
+}
+function aligned(direction,bias){return (direction==='LONG'&&bias==='BULLISH')||(direction==='SHORT'&&bias==='BEARISH');}
+function opposed(direction,bias){return (direction==='LONG'&&bias==='BEARISH')||(direction==='SHORT'&&bias==='BULLISH');}
+function nearIndex(a,b,max=4){return a&&b&&Math.abs(a.index-b.index)<=max;}
 
-const FAMILIES = Object.freeze([
-  {
-    id: 'LR-MSS-FVG',
-    name: 'Liquidity Reversal · MSS · FVG',
-    required: ['liquidity_raid', 'structure_shift', 'displacement', 'fvg', 'structural_invalidation', 'external_liquidity_target'],
-    optional: ['rejection', 'htf_alignment'],
-    thesis: 'A liquidity raid fails, structure changes, displacement confirms repricing, and the imbalance retest becomes the single execution location.',
-  },
-  {
-    id: 'LR-DISP-FVG',
-    name: 'Liquidity Reversal · Displacement · FVG',
-    required: ['liquidity_raid', 'displacement', 'fvg', 'structural_invalidation', 'external_liquidity_target'],
-    optional: ['structure_shift', 'rejection', 'htf_alignment'],
-    thesis: 'A failed liquidity attack is followed by directional repricing and a nearby imbalance retrace toward opposing external liquidity.',
-  },
-  {
-    id: 'BRK-RETEST',
-    name: 'Displaced Breaker Retest',
-    required: ['breaker', 'displacement', 'structural_invalidation', 'external_liquidity_target'],
-    optional: ['htf_alignment'],
-    thesis: 'A displaced structure break establishes a breaker and the retest holds on the continuation side.',
-  },
-  {
-    id: 'HTF-DISP-FVG',
-    name: 'HTF-Aligned Displacement Retrace',
-    required: ['htf_alignment', 'displacement', 'fvg', 'structural_invalidation', 'external_liquidity_target'],
-    optional: ['liquidity_raid', 'structure_shift'],
-    thesis: 'Higher-timeframe structure supplies direction, execution displacement supplies confirmation, and an imbalance retrace supplies the single entry.',
-  },
-  {
-    id: 'FALSE-BREAK-REV',
-    name: 'False-Breakout Liquidity Reversal',
-    required: ['liquidity_raid', 'false_breakout', 'rejection', 'structural_invalidation', 'external_liquidity_target'],
-    optional: ['structure_shift', 'displacement'],
-    thesis: 'An external liquidity breakout fails, price reclaims the level, and rejection defines a bounded reversal toward opposing liquidity.',
-  },
-  {
-    id: 'LIQ-REJECT',
-    name: 'Liquidity Rejection Reversal',
-    required: ['liquidity_raid', 'rejection', 'structural_invalidation', 'external_liquidity_target'],
-    optional: ['structure_shift', 'displacement', 'fvg'],
-    thesis: 'A liquidity attack is rejected at the structural extreme and the reversal is bounded by that failed attack.',
-  },
-]);
-
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-function uniq(values) { return [...new Set(values.filter(Boolean))]; }
-
-function factsForCandidate(candidate) {
-  const facts = new Set(SOURCE_FACTS[candidate?.setupId] || []);
-  const text = `${candidate?.setup || ''} ${(candidate?.evidence || []).join(' ')} ${candidate?.trigger || ''}`.toLowerCase();
-  if (/raid|sweep|liquidity/.test(text)) facts.add('liquidity_raid');
-  if (/false breakout|falsely broke|closed back inside/.test(text)) facts.add('false_breakout');
-  if (/structural shift|structure shift|mss/.test(text)) facts.add('structure_shift');
-  if (/displacement/.test(text)) facts.add('displacement');
-  if (/fair-value gap|fair value gap|fvg/.test(text)) facts.add('fvg');
-  if (/breaker/.test(text)) facts.add('breaker');
-  if (/rejection/.test(text)) facts.add('rejection');
-  if (/higher-timeframe|higher timeframe/.test(text)) facts.add('htf_alignment');
-  if (candidate?.dol) facts.add('external_liquidity_target');
-  if (candidate?.invalidation && Number.isInteger(candidate?.stopY)) facts.add('structural_invalidation');
-  if (candidate?.trigger && Number.isInteger(candidate?.entryY)) facts.add('fixed_single_trigger');
-  return [...facts];
+function targetFor(model,direction,entry,stop){
+  const risk=Math.abs(entry-stop);
+  return nearestTarget(model,direction,entry,Math.max(risk*1.15,model.stats.medianRange*0.65));
 }
 
-function familyFit(family, facts) {
-  const set = new Set(facts);
-  const requiredHit = family.required.filter(x => set.has(x));
-  const missing = family.required.filter(x => !set.has(x));
-  const optionalHit = family.optional.filter(x => set.has(x));
-  const coverage = requiredHit.length / family.required.length;
-  const score = coverage * 82 + Math.min(18, optionalHit.length * 6);
-  return { family, requiredHit, missing, optionalHit, coverage, score };
-}
-
-function contextState(candidate, contextBias) {
-  if (!contextBias || contextBias === 'NEUTRAL') return 'UNCONFIRMED';
-  const aligned = (candidate.direction === 'LONG' && contextBias === 'BULLISH') || (candidate.direction === 'SHORT' && contextBias === 'BEARISH');
-  return aligned ? 'ALIGNED' : 'CONFLICT';
-}
-
-function geometryValid(candidate) {
-  if (![candidate?.entryY, candidate?.stopY, candidate?.targetY].every(Number.isInteger)) return false;
-  if (candidate.direction === 'LONG') return candidate.targetY < candidate.entryY && candidate.entryY < candidate.stopY;
-  if (candidate.direction === 'SHORT') return candidate.stopY < candidate.entryY && candidate.entryY < candidate.targetY;
-  return false;
-}
-
-function architectScore(candidate, fit, native) {
-  let score = Number(candidate?.score || 0) * 0.52 + fit.score * 0.38;
-  if (geometryValid(candidate)) score += 6;
-  if ((candidate?.evidence || []).length >= 3) score += 3;
-  const context = contextState(candidate, native?.contextBias);
-  if (context === 'ALIGNED') score += 5;
-  if (context === 'CONFLICT') score -= 10;
-  if (!candidate?.trigger || !candidate?.invalidation || !candidate?.dol) score -= 12;
-  if (!fit.missing.length && fit.coverage === 1) score += 3;
-  return clamp(Math.round(score), 0, 100);
-}
-
-function generatedId(family, facts, direction) {
-  const suffix = facts.includes('htf_alignment') ? '-HTF' : facts.includes('structure_shift') ? '-MSS' : '';
-  return `ARCH-${family.id}${suffix}-${direction === 'LONG' ? 'L' : 'S'}`;
-}
-
-function createDraft(candidate, native, index) {
-  const facts = factsForCandidate(candidate);
-  const fits = FAMILIES.map(family => familyFit(family, facts)).sort((a, b) => b.score - a.score || a.missing.length - b.missing.length);
-  const fit = fits[0];
-  const score = architectScore(candidate, fit, native);
-  const context = contextState(candidate, native?.contextBias);
-  const vetoes = [];
-  if (fit.coverage < 1) vetoes.push(`Missing thesis facts: ${fit.missing.map(x => FACTS[x]?.label || x).join(', ')}`);
-  if (!geometryValid(candidate)) vetoes.push('Visual entry/stop/target geometry is invalid.');
-  if (context === 'CONFLICT') vetoes.push('Higher-timeframe reconstructed structure conflicts with the proposed direction.');
-  if (!candidate?.trigger) vetoes.push('No single execution trigger exists.');
-  if (!candidate?.invalidation) vetoes.push('No structural invalidation exists.');
-  if (!candidate?.dol) vetoes.push('No opposing liquidity objective exists.');
-
+function makeHypothesis({kind,direction,entry,stop,target,trigger,invalidation,thesis,facts,evidence,indices,model}){
+  if (![entry,stop,target?.value].every(Number.isFinite)) return null;
+  const rr=visualRR(direction,entry,stop,target.value);
   return {
-    index,
-    candidate,
-    family: fit.family,
-    facts,
-    missing: fit.missing,
-    context,
-    score,
-    vetoes,
-    generatedId: generatedId(fit.family, facts, candidate.direction),
+    kind,direction,entryP:entry,stopP:stop,targetP:target.value,
+    entryY:priceLikeToPermille(entry),stopY:priceLikeToPermille(stop),targetY:priceLikeToPermille(target.value),
+    trigger,invalidation,thesis,facts:uniq(facts),evidence:uniq(evidence),indices,rr,
+    dol:direction==='LONG'?'Opposing buy-side external liquidity':'Opposing sell-side external liquidity',
+    targetPrimitive:target,modelVersion:model.version,
   };
 }
 
-export function architectStrategy(native, shots = []) {
-  const candidates = Array.isArray(native?.candidates) ? native.candidates : [];
-  if (!candidates.length || !Number.isInteger(native?.executionIndex)) {
-    return {
-      ...native,
-      architect: {
-        version: ARCHITECT_VERSION,
-        mode: 'deterministic-strategy-creator',
-        created: false,
-        reason: native?.reason || 'No native market candidate was available to architect.',
-        drafts: [],
-      },
-    };
+function hypothesesForDirection(model,direction){
+  const p=model.primitives,s=model.stats,last=model.lastClose,pad=s.medianRange*0.10,out=[];
+  const raids=(p.raids||[]).filter(x=>x.direction===direction);
+  const shifts=(p.shifts||[]).filter(x=>x.direction===direction);
+  const disps=(p.displacements||[]).filter(x=>x.direction===direction);
+  const gaps=(p.fvgs||[]).filter(x=>x.direction===direction);
+  const breakers=(p.breakers||[]).filter(x=>x.direction===direction);
+  const rejects=(p.rejections||[]).filter(x=>x.direction===direction);
+  const raid=latest(raids), shift=raid?latest(shifts,x=>x.index>raid.index):null;
+  const disp=raid?latest(disps,x=>x.index>=raid.index):latest(disps);
+  const fvg=raid?latest(gaps,x=>x.index>=raid.index):latest(gaps);
+  const breaker=latest(breakers), rejection=latest(rejects);
+
+  if(raid&&shift&&disp&&fvg&&shift.index>raid.index&&disp.index>=raid.index&&fvg.index>=raid.index){
+    const entry=fvg.midpoint,stop=direction==='LONG'?raid.extreme-pad:raid.extreme+pad,target=targetFor(model,direction,entry,stop);
+    const h=makeHypothesis({kind:'REVERSAL_MSS_IMBALANCE',direction,entry,stop,target,model,
+      trigger:'Retest of the post-shift imbalance midpoint while the raid extreme remains intact.',
+      invalidation:'Trade is invalid beyond the failed-liquidity raid extreme plus the structural buffer.',
+      thesis:'External liquidity is raided and reclaimed, internal structure shifts, displacement confirms repricing, and the resulting imbalance becomes the single execution location.',
+      facts:['liquidity_raid','reclaim','structure_shift','displacement','fvg','external_liquidity_target','structural_invalidation'],
+      evidence:[`${raid.side} liquidity was raided and reclaimed.`,`Structure shifted ${shift.index-raid.index} reconstructed candles after the raid.`,`Directional displacement and an imbalance formed after the raid.`],indices:{raid:raid.index,shift:shift.index,displacement:disp.index,fvg:fvg.index}});
+    if(h)out.push(h);
   }
 
-  const drafts = candidates.map((candidate, index) => createDraft(candidate, native, index)).sort((a, b) => b.score - a.score);
-  const winner = drafts.find(d => d.vetoes.length === 0 && d.score >= 70) || null;
-  if (!winner) {
-    const strongest = drafts[0];
-    return {
-      ...native,
-      decision: 'WAIT',
-      reason: strongest
-        ? `Strategy Architect refused creation: ${strongest.vetoes[0] || `architect score ${strongest.score} is below 70`}`
-        : 'Strategy Architect found no coherent strategy draft.',
-      best: null,
-      architect: {
-        version: ARCHITECT_VERSION,
-        mode: 'deterministic-strategy-creator',
-        created: false,
-        reason: strongest?.vetoes?.[0] || 'No draft cleared the architecture threshold.',
-        drafts: drafts.slice(0, 4).map(d => ({ id: d.generatedId, family: d.family.name, score: d.score, vetoes: d.vetoes, facts: d.facts })),
-      },
-    };
+  if(raid&&disp&&fvg&&disp.index>=raid.index&&fvg.index>=raid.index){
+    const entry=fvg.midpoint,stop=direction==='LONG'?raid.extreme-pad:raid.extreme+pad,target=targetFor(model,direction,entry,stop);
+    const h=makeHypothesis({kind:'FAILED_AUCTION_REPRICE',direction,entry,stop,target,model,
+      trigger:'Single retest of the imbalance created after the failed liquidity attack.',
+      invalidation:'Invalid beyond the reclaimed raid extreme plus the structural buffer.',
+      thesis:'A failed external liquidity attack is followed by directional repricing; the imbalance retrace is used only while the failed auction remains intact.',
+      facts:['liquidity_raid','reclaim','displacement','fvg','external_liquidity_target','structural_invalidation'],
+      evidence:[`${raid.side} liquidity attack failed and reclaimed.`,`Directional repricing followed the failed attack.`,`A nearby same-direction imbalance supplies the entry location.`],indices:{raid:raid.index,displacement:disp.index,fvg:fvg.index}});
+    if(h)out.push(h);
   }
 
-  const source = winner.candidate;
-  const strategyName = `${winner.family.name} · ${source.direction === 'LONG' ? 'Long' : 'Short'}`;
-  const factLabels = winner.facts.map(x => FACTS[x]?.label || x);
-  const executionShot = shots[native.executionIndex];
-  const architectEvidence = [
-    `Strategy Architect created this plan from ${factLabels.length} verified market primitives: ${factLabels.join(', ')}.`,
-    `Created thesis: ${winner.family.thesis}`,
-    `Architecture score ${winner.score}/100; context ${winner.context.toLowerCase()}; execution source ${executionShot ? `${executionShot.instrument} ${executionShot.timeframe}` : `screenshot ${native.executionIndex + 1}`}.`,
-  ];
+  if(breaker&&disp){
+    const entry=breaker.level,stop=direction==='LONG'?breaker.extreme-pad:breaker.extreme+pad,target=targetFor(model,direction,entry,stop);
+    const h=makeHypothesis({kind:'DISPLACED_BREAK_RETEST',direction,entry,stop,target,model,
+      trigger:'Retest of the displaced broken swing while price continues to hold on the continuation side.',
+      invalidation:'Invalid beyond the retest extreme plus the structural buffer.',
+      thesis:'A directional displacement breaks structure and the broken level subsequently holds as a continuation retest.',
+      facts:['displacement','breaker_retest','external_liquidity_target','structural_invalidation'],
+      evidence:['A swing was displaced through and later retested.','The retest closed on the continuation side.'],indices:{break:breaker.breakIndex,retest:breaker.index}});
+    if(h)out.push(h);
+  }
 
-  return {
-    ...native,
-    decision: source.direction,
-    reason: '',
-    best: {
-      ...source,
-      sourceSetupId: source.setupId,
-      sourceSetup: source.setup,
-      setupId: winner.generatedId,
-      setup: strategyName,
-      score: winner.score,
-      evidence: uniq([...(source.evidence || []), ...architectEvidence]),
-      trigger: source.trigger,
-      invalidation: source.invalidation,
-      creatorThesis: winner.family.thesis,
-      creatorFacts: winner.facts,
-      creatorFamily: winner.family.id,
-    },
-    architect: {
-      version: ARCHITECT_VERSION,
-      mode: 'deterministic-strategy-creator',
-      created: true,
-      strategyId: winner.generatedId,
-      strategyName,
-      thesis: winner.family.thesis,
-      facts: winner.facts,
-      factLabels,
-      score: winner.score,
-      context: winner.context,
-      sourceDetector: source.setupId,
-      alternativesRejected: drafts.filter(d => d !== winner).slice(0, 5).map(d => ({ id: d.generatedId, family: d.family.name, score: d.score, vetoes: d.vetoes })),
-    },
-  };
+  if(model.contextBias&&aligned(direction,model.contextBias)&&disp&&fvg){
+    const entry=fvg.midpoint;
+    const recent=model.candles.slice(Math.max(0,disp.index-2));
+    const stop=direction==='LONG'?Math.min(...recent.map(c=>c.low))-pad:Math.max(...recent.map(c=>c.high))+pad;
+    const target=targetFor(model,direction,entry,stop);
+    const h=makeHypothesis({kind:'HTF_EXPANSION_RETRACE',direction,entry,stop,target,model,
+      trigger:'Retest of the execution imbalance while reconstructed higher-timeframe structure remains aligned.',
+      invalidation:'Invalid beyond the displacement-leg structural extreme.',
+      thesis:'Higher-timeframe structure supplies direction; execution displacement confirms expansion; the imbalance retrace provides a single continuation entry toward external liquidity.',
+      facts:['htf_alignment','displacement','fvg','external_liquidity_target','structural_invalidation'],
+      evidence:[`Higher-timeframe reconstructed bias is ${model.contextBias.toLowerCase()}.`,'Execution displacement agrees with that context.','A same-direction imbalance remains available for retrace.'],indices:{displacement:disp.index,fvg:fvg.index}});
+    if(h)out.push(h);
+  }
+
+  if(raid&&rejection&&nearIndex(raid,rejection,3)){
+    const entry=model.candles[Math.min(model.candles.length-1,rejection.index+1)]?.open??last;
+    const extreme=direction==='LONG'?Math.min(raid.extreme,rejection.extreme):Math.max(raid.extreme,rejection.extreme);
+    const stop=direction==='LONG'?extreme-pad:extreme+pad,target=targetFor(model,direction,entry,stop);
+    const h=makeHypothesis({kind:'FAILED_BREAK_REJECTION',direction,entry,stop,target,model,
+      trigger:'Confirmation at the rejection follow-through/open; do not chase beyond the defined execution location.',
+      invalidation:'Invalid through the failed-break/rejection extreme plus the structural buffer.',
+      thesis:'A liquidity breakout fails and is rejected at the structural extreme, creating a bounded reversal toward opposing external liquidity.',
+      facts:['liquidity_raid','reclaim','rejection','external_liquidity_target','structural_invalidation'],
+      evidence:[`${raid.side} liquidity was attacked and reclaimed.`,'A directional rejection occurred within three reconstructed candles of the failed break.'],indices:{raid:raid.index,rejection:rejection.index}});
+    if(h)out.push(h);
+  }
+  return out;
 }
 
-export function strategyKnowledgeSummary() {
-  return {
-    version: ARCHITECT_VERSION,
-    mode: 'deterministic-strategy-creator',
-    externalInference: false,
-    principle: 'Perception extracts market facts; the architect composes and vetoes the strategy from those facts. No language model selects the trade.',
-    knowledgeDomains: [
-      'liquidity raids and failed breakouts',
-      'market structure shifts',
-      'displacement',
-      'fair value gaps and retraces',
-      'breaker retests',
-      'rejection behavior',
-      'higher-timeframe directional alignment',
-      'external-liquidity targets',
-      'single-trigger execution',
-      'structural invalidation and one-target risk geometry',
-    ],
-    facts: Object.fromEntries(Object.entries(FACTS).map(([id, fact]) => [id, fact])),
-    families: FAMILIES.map(f => ({ id: f.id, name: f.name, required: f.required, optional: f.optional, thesis: f.thesis })),
-    failClosed: true,
-    limitation: 'The architect can only know facts that the native perception layer can reconstruct from the supplied screenshots; it does not claim unseen market data or guaranteed profitability.',
+function critic(h,model){
+  const vetoes=[],warnings=[];
+  if(!Number.isFinite(h.rr)||h.rr<1.0)vetoes.push('Reward/risk geometry is below 1.0.');
+  if(h.rr>20)vetoes.push('Reward/risk geometry is implausibly large for the visible chart.');
+  if(opposed(h.direction,model.contextBias))vetoes.push('Higher-timeframe reconstructed context opposes the strategy direction.');
+  if(!h.trigger||!h.invalidation)vetoes.push('Execution trigger or structural invalidation is missing.');
+  if(!h.targetPrimitive)vetoes.push('No opposing external-liquidity target is visible.');
+  const dist=Math.abs(model.lastClose-h.entryP)/Math.max(1e-9,model.stats.medianRange);
+  if(dist>3.2)vetoes.push('Entry location is too far from current reconstructed price action.');
+  if(model.quality<45)vetoes.push('Execution chart reconstruction quality is too weak.');
+  if(model.dealingRange){
+    if(h.direction==='LONG'&&model.dealingRange.zone==='PREMIUM')warnings.push('Long thesis is forming in the premium half of the recent dealing range.');
+    if(h.direction==='SHORT'&&model.dealingRange.zone==='DISCOUNT')warnings.push('Short thesis is forming in the discount half of the recent dealing range.');
+  }
+  const requiredOrder=['raid','shift','displacement','fvg'].map(k=>h.indices?.[k]).filter(Number.isInteger);
+  for(let i=1;i<requiredOrder.length;i++) if(requiredOrder[i]<requiredOrder[i-1]) vetoes.push('Causal event ordering is inconsistent.');
+  const freshness=Math.max(...Object.values(h.indices||{}).filter(Number.isInteger),0);
+  const age=Math.max(0,model.candles.length-1-freshness);
+  if(age>14)vetoes.push('The defining structure is stale relative to the right edge of the chart.');
+  else if(age>8)warnings.push('The defining structure is no longer very fresh.');
+  return {passed:vetoes.length===0,vetoes,warnings,entryDistanceInMedianRanges:Number(dist.toFixed(2)),age};
+}
+
+function evidenceScore(h,model,review){
+  let score=0;
+  score+=clamp(model.quality,0,100)*0.28;
+  score+=clamp(h.facts.length/8,0,1)*32;
+  score+=clamp(h.evidence.length/4,0,1)*14;
+  if(aligned(h.direction,model.contextBias))score+=10;
+  if(Number.isFinite(h.rr)&&h.rr>=1.2&&h.rr<=6)score+=10;
+  if(review.warnings.length)score-=review.warnings.length*4;
+  if(review.vetoes.length)score-=review.vetoes.length*20;
+  return clamp(Math.round(score),0,100);
+}
+
+function idFor(h){
+  const bits=[h.kind,h.direction,...h.facts.slice().sort()].join('|');
+  let hash=2166136261;
+  for(let i=0;i<bits.length;i++){hash^=bits.charCodeAt(i);hash=Math.imul(hash,16777619);}
+  return `ARCH6-${h.kind}-${h.direction==='LONG'?'L':'S'}-${(hash>>>0).toString(16).slice(0,6).toUpperCase()}`;
+}
+
+export function architectStrategy(native,shots=[]){
+  const model=buildMarketModel(native,shots);
+  if(!model.ok){
+    return {...native,decision:'WAIT',best:null,marketModel:model,architect:{version:ARCHITECT_VERSION,mode:CREATOR_MODE,created:false,reason:model.reason,hypotheses:[],namedDetectorIndependent:true}};
+  }
+  const hypotheses=[...hypothesesForDirection(model,'LONG'),...hypothesesForDirection(model,'SHORT')].map(h=>{
+    const review=critic(h,model),score=evidenceScore(h,model,review);
+    return {...h,review,score,id:idFor(h)};
+  }).sort((a,b)=>b.score-a.score);
+
+  const winner=hypotheses.find(h=>h.review.passed&&h.score>=64)||null;
+  if(!winner){
+    const strongest=hypotheses[0];
+    const reason=strongest?(strongest.review.vetoes[0]||`strongest primitive hypothesis scored ${strongest.score}, below 64`):'No coherent strategy hypothesis could be constructed from primitive market evidence.';
+    return {...native,decision:'WAIT',reason:`Strategy Architect v6 refused creation: ${reason}`,best:null,marketModel:model,architect:{version:ARCHITECT_VERSION,mode:CREATOR_MODE,created:false,reason,namedDetectorIndependent:true,hypotheses:hypotheses.slice(0,6).map(h=>({id:h.id,kind:h.kind,direction:h.direction,score:h.score,vetoes:h.review.vetoes,warnings:h.review.warnings,facts:h.facts}))}};
+  }
+
+  const strategyName=winner.kind.split('_').map(x=>x[0]+x.slice(1).toLowerCase()).join(' ');
+  const evidence=uniq([
+    ...winner.evidence,
+    `Strategy Creator built this thesis directly from ${winner.facts.length} primitive market facts; no S01/S05/S11-style setup ID was used as an input.`,
+    `Market-state graph contains ${model.graph.nodes.length} primitive nodes and ${model.graph.edges.length} causal/temporal relationships.`,
+    `Adversarial critic passed with ${winner.review.warnings.length} warning(s) and zero vetoes.`,
+  ]);
+  return {...native,decision:winner.direction,reason:'',marketModel:model,best:{
+    setupId:winner.id,setup:strategyName,direction:winner.direction,entryY:winner.entryY,stopY:winner.stopY,targetY:winner.targetY,
+    score:winner.score,evidence,trigger:winner.trigger,invalidation:winner.invalidation,dol:winner.dol,creatorThesis:winner.thesis,creatorFacts:winner.facts,creatorKind:winner.kind,visualRR:Number(winner.rr.toFixed(2)),sourceSetupId:null,sourceSetup:null,
+  },architect:{version:ARCHITECT_VERSION,mode:CREATOR_MODE,created:true,strategyId:winner.id,strategyName,thesis:winner.thesis,facts:winner.facts,score:winner.score,critic:winner.review,namedDetectorIndependent:true,sourceDetector:null,marketGraph:{nodes:model.graph.nodes.length,edges:model.graph.edges.length},alternativesRejected:hypotheses.filter(h=>h!==winner).slice(0,6).map(h=>({id:h.id,kind:h.kind,direction:h.direction,score:h.score,vetoes:h.review.vetoes,warnings:h.review.warnings}))}};
+}
+
+export function strategyKnowledgeSummary(){
+  const market=marketModelKnowledgeSummary();
+  return {version:ARCHITECT_VERSION,mode:CREATOR_MODE,externalInference:false,namedDetectorIndependent:true,
+    principle:'Perception reconstructs candles. Market Model v6 derives primitives and relationships. The Strategy Architect invents competing hypotheses from that graph and a deterministic critic tries to falsify each one before execution.',
+    knowledgeDomains:market.primitives,
+    hypothesisMechanisms:['failed-auction reversal','structure-shift repricing','displacement/imbalance continuation','displaced breaker retest','failed-break rejection reversal'],
+    criticChecks:['price geometry','minimum reward/risk','higher-timeframe conflict','external target existence','entry proximity','chart reconstruction quality','causal ordering','structure freshness','dealing-range warning'],
+    marketGraph:market,failClosed:true,
+    limitation:'The creator is independent of named setup IDs, but it can only use market facts reconstructed from supplied screenshots. Native timestamp/session alignment and NQ↔ES synchronized SMT remain unverified and are not invented.',
   };
 }
