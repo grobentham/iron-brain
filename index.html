@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f4f1e9" />
   <title>ICT Brain — Native One Trade</title>
-  <meta name="description" content="Deterministic server-side ICT chart analysis. No external model API. One fixed trade or WAIT." />
+  <meta name="description" content="GitHub-hosted ICT Brain interface for deterministic local chart analysis. No external model API. One fixed trade or WAIT." />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -13,27 +13,35 @@
     <header class="topbar">
       <div class="brandmark">IB</div>
       <div class="brand">ICT BRAIN</div>
-      <div id="backendStatus" class="pill">Checking backend…</div>
+      <div id="backendStatus" class="pill">Checking local engine…</div>
     </header>
 
     <section class="hero">
-      <p class="eyebrow">NATIVE ENGINE · NO MODEL API · ONE TRADE</p>
+      <p class="eyebrow">GITHUB PAGES UI · LOCAL ENGINE · NO MODEL API · ONE TRADE</p>
       <h1>See the chart.<br>Reconstruct the setup.</h1>
-      <p class="lede">Upload up to four NQ/MNQ/ES screenshots. ICT Brain reconstructs candles from pixels, reads the visible price scale with local OCR, applies deterministic ICT rules, and returns one fixed plan — or WAIT.</p>
+      <p class="lede">The website is a static interface hosted by GitHub Pages. Analysis runs in your own ICT Brain engine on this PC, not on GitHub and not through an external AI/model API.</p>
     </section>
 
     <section class="block">
       <div class="heading"><div><span>01</span><h2>Your charts</h2></div><strong id="count">0 / 4</strong></div>
-      <label class="drop" for="files"><b>Add screenshots</b><small>PNG, JPG or WEBP · up to four</small></label>
+      <label class="drop" for="files"><b>Add screenshots</b><small>PNG, JPG or WEBP · up to four in manual upload mode</small></label>
       <input id="files" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
-      <p class="hint">Recommended stack: <b>1H NQ → 15m NQ → 5m MNQ → 1m MNQ</b>. Set the instrument/timeframe manually and keep the right-side price scale visible.</p>
+      <p class="hint">Recommended manual stack: <b>1H NQ → 15m NQ → 5m MNQ → 1m MNQ</b>. Live Bridge v1.2 handles the five-chart stack including ES 1m.</p>
       <div id="shots" class="shots"></div>
     </section>
 
     <section class="block">
       <div class="heading"><div><span>02</span><h2>Native analysis rules</h2></div></div>
-      <p class="hint"><b>No ChatGPT, Gemini, Claude, AI Gateway, or external inference API is used.</b> v4 executes native screenshot reconstruction for S01, S05, S06, S09, S11 and S12. Time-window and cross-market setups remain fail-closed until their native alignment extractors are certified.</p>
-      <details class="access"><summary>Private access key</summary><input id="accessKey" type="password" autocomplete="off" placeholder="Only needed if configured on the server"><p class="hint">Stored only in this browser. It is never committed to GitHub.</p></details>
+      <p class="hint"><b>No ChatGPT, Gemini, Claude, AI Gateway, or external inference API is used.</b> The GitHub-hosted page contains only the UI. Candle reconstruction, time/price grounding, synchronized SMT, multi-timeframe market modeling, DOL ranking, strategy creation, critic checks and lifecycle processing belong to the local ICT Brain engine.</p>
+      <details class="access" open>
+        <summary>Local engine connection</summary>
+        <label for="backendUrl">Engine URL</label>
+        <input id="backendUrl" type="url" value="http://127.0.0.1:8787" autocomplete="off" spellcheck="false">
+        <p class="hint">Default: <b>http://127.0.0.1:8787</b>. This points only to your own computer. Start the local ICT Brain engine before running analysis.</p>
+        <label for="accessKey">Optional access key</label>
+        <input id="accessKey" type="password" autocomplete="off" placeholder="Leave blank for the normal local engine">
+        <p class="hint">Connection settings are stored only in this browser.</p>
+      </details>
     </section>
 
     <section class="block action">
@@ -44,7 +52,7 @@
     <section id="result" class="result" hidden aria-live="polite"></section>
 
     <footer>
-      <p><b>Privacy:</b> screenshots are sent only to your Vercel function, processed in memory with bundled software, and are not intentionally stored by ICT Brain. No broker orders are placed.</p>
+      <p><b>Privacy:</b> GitHub Pages serves only the static website files. When using the default local engine URL, screenshots are sent to the ICT Brain process running on your own PC. No broker orders are placed.</p>
       <p class="hint">Research support only. Confidence is deterministic evidence quality, not win probability.</p>
     </footer>
   </main>
