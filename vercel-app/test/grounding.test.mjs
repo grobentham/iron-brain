@@ -37,6 +37,19 @@ test('rejects OCR prices that are not aligned to the 0.25 futures tick', () => {
   assert.equal(samples[0].price, 21020.25);
 });
 
+test('reassembles split TradingView price labels on the same OCR row', () => {
+  const hocr = `
+    <span class='ocrx_word' title='bbox 4 100 35 125; x_wconf 88'>21</span>
+    <span class='ocrx_word' title='bbox 37 101 83 126; x_wconf 91'>040</span>
+    <span class='ocrx_word' title='bbox 85 100 110 126; x_wconf 84'>.25</span>
+    <span class='ocrx_word' title='bbox 4 300 72 326; x_wconf 90'>21020</span>
+    <span class='ocrx_word' title='bbox 74 300 108 326; x_wconf 90'>,00</span>
+  `;
+  const samples = parseHocrPriceSamples(hocr, 1000);
+  assert.equal(samples.some(x => x.price === 21040.25), true);
+  assert.equal(samples.some(x => x.price === 21020), true);
+});
+
 test('refuses excessive price extrapolation beyond visible labels', () => {
   const samples = [
     { y: .20, price: 21040, raw: '21040' },
