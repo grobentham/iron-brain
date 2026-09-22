@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f4f1e9" />
-  <title>ICT Brain — Live Native Trade Engine</title>
-  <meta name="description" content="Hosted deterministic ICT chart analysis with TradingView Live Bridge. No external model API. One fixed trade or WAIT." />
+  <title>ICT Brain — Browser Native</title>
+  <meta name="description" content="Browser-native ICT Brain chart analysis. TradingView Live Bridge feeds the website; all analysis runs in the browser with no hosted backend or external model API." />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -13,13 +13,13 @@
     <header class="topbar">
       <div class="brandmark">IB</div>
       <div class="brand">ICT BRAIN</div>
-      <div id="backendStatus" class="pill">Checking hosted engine…</div>
+      <div id="backendStatus" class="pill">Loading browser engine…</div>
     </header>
 
     <section class="hero">
-      <p class="eyebrow">HOSTED NATIVE ENGINE · LIVE TRADINGVIEW BRIDGE · NO MODEL API</p>
-      <h1>Open TradingView.<br>ICT Brain watches.</h1>
-      <p class="lede">Keep TradingView and ICT Brain open. Live Bridge captures your authorized charts, the website backend reconstructs and evaluates the market, and this dashboard updates with one LONG, SHORT, or WAIT decision.</p>
+      <p class="eyebrow">BROWSER NATIVE · GITHUB PAGES · NO SERVER BACKEND · NO MODEL API</p>
+      <h1>Open TradingView.<br>ICT Brain analyzes here.</h1>
+      <p class="lede">TradingView stays in one tab and ICT Brain stays in another. Live Bridge reads only the charts you connect. Candle reconstruction, time/price grounding, synchronized SMT, multi-timeframe modeling, DOL ranking, Strategy Architect and lifecycle logic execute inside this webpage on your laptop.</p>
     </section>
 
     <section class="block">
@@ -28,17 +28,20 @@
         <div class="tile"><small>Live Bridge</small><b id="bridgeStatus">Checking extension…</b></div>
         <div class="tile"><small>Lifecycle</small><b id="lifecycleState">WATCHING</b></div>
         <div class="tile"><small>Last scan</small><b id="lastScan">Never</b></div>
-        <div class="tile"><small>Live Scan</small><b id="monitorState">OFF</b></div>
+        <div class="tile"><small>Engine</small><b>On this webpage</b></div>
       </div>
       <p id="liveError" class="error"></p>
       <div class="live-actions">
-        <button id="scanLive" class="primary" disabled>Scan TradingView now</button>
-        <label class="monitor-control"><input id="liveToggle" type="checkbox" disabled> <span>Analyze automatically when connected charts change</span></label>
+        <button id="scanLive" class="primary" disabled>Analyze TradingView now</button>
+        <label class="monitor-control"><input id="liveToggle" type="checkbox"> <span>Analyze automatically</span></label>
+        <label class="interval-control">Every
+          <select id="interval"><option value="15">15 sec</option><option value="30" selected>30 sec</option><option value="60">1 min</option><option value="120">2 min</option></select>
+        </label>
       </div>
-      <p class="hint">Recommended stack: <b>NQ 1H → NQ 15m → MNQ 5m → MNQ 1m → ES 1m</b>. Install Live Bridge once; after that the website receives its state automatically.</p>
+      <p class="hint">Recommended stack: <b>NQ 1H → NQ 15m → MNQ 5m → MNQ 1m → ES 1m</b>. Connect the TradingView charts once from the Live Bridge popup. The extension remembers and reconnects them when TradingView opens.</p>
       <section id="liveResult" class="result compact-result" aria-live="polite">
         <h2 class="decision wait">Wait.</h2>
-        <p class="setup">Waiting for Live Bridge and the first TradingView scan.</p>
+        <p class="setup">Waiting for Live Bridge and the first browser-native scan.</p>
       </section>
     </section>
 
@@ -46,27 +49,22 @@
       <div class="heading"><div><span>02</span><h2>Manual fallback</h2></div><strong id="count">0 / 4</strong></div>
       <label class="drop" for="files"><b>Add screenshots</b><small>PNG, JPG or WEBP · up to four</small></label>
       <input id="files" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
-      <p class="hint">Manual upload remains available if Live Bridge is unavailable. Use <b>1H NQ → 15m NQ → 5m MNQ → 1m MNQ</b> and keep the right-side price scale visible.</p>
+      <p class="hint">Manual screenshots can still be reconstructed locally. A real trade requires reliable price grounding; Live Bridge is preferred because it supplies the visible TradingView price and time labels directly.</p>
       <div id="shots" class="shots"></div>
       <div class="action manual-action">
-        <button id="analyze" class="primary" disabled>Analyze uploaded charts</button>
-        <div id="progress" class="progress" hidden><span class="spinner"></span><span id="progressText">Preparing charts…</span></div>
+        <button id="analyze" class="primary" disabled>Analyze in browser</button>
+        <div id="progress" class="progress" hidden><span class="spinner"></span><span id="progressText">Analyzing locally…</span></div>
       </div>
       <section id="result" class="result" hidden aria-live="polite"></section>
     </section>
 
     <section class="block">
-      <div class="heading"><div><span>03</span><h2>Native analysis contract</h2></div></div>
-      <p class="hint"><b>No ChatGPT, Gemini, Claude, AI Gateway, or external inference API is used.</b> The hosted backend executes ICT Brain's own deterministic candle reconstruction, price/time grounding, synchronized NQ↔ES analysis, multi-timeframe market graph, DOL ranking, Strategy Architect, critic and lifecycle code.</p>
-      <details class="access">
-        <summary>Private access key</summary>
-        <input id="accessKey" type="password" autocomplete="off" placeholder="Only needed if private backend access is enabled">
-        <p class="hint">Stored only in this browser. The normal public deployment can leave this blank.</p>
-      </details>
+      <div class="heading"><div><span>03</span><h2>What runs here</h2></div></div>
+      <p class="hint"><b>No Vercel, Railway, Render, localhost service, ChatGPT, Gemini, Claude, AI Gateway, or external inference API is required.</b> GitHub Pages only delivers the website files. Once loaded, the analysis runs with browser JavaScript, Canvas/ImageData and ICT Brain's deterministic market-model code on your own laptop.</p>
     </section>
 
     <footer>
-      <p><b>Workflow:</b> TradingView → Live Bridge → ICT Brain website backend → this dashboard. Screenshots are processed in memory and are not intentionally stored by ICT Brain. No broker orders are placed.</p>
+      <p><b>Workflow:</b> TradingView → Live Bridge → this ICT Brain webpage → LONG / SHORT / WAIT. No chart is intentionally uploaded to an analysis server and no broker orders are placed.</p>
       <p class="hint">Research support only. Confidence is deterministic evidence quality, not win probability.</p>
     </footer>
   </main>
