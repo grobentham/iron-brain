@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "ICT Brain Live Bridge",
+  "version": "1.0.0",
+  "description": "Connect authorized TradingView tabs to the native ICT Brain backend for live chart scanning without external model APIs.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "alarms",
+    "notifications",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.tradingview.com/*",
+    "https://iron-brain.vercel.app/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "ICT Brain Live Bridge",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.tradingview.com/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
