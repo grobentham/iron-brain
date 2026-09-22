@@ -1,4 +1,5 @@
 const PRICE_RE = /^(?:\d{1,3}(?:,\d{3})+|\d{4,6})(?:\.\d{1,2})?$/;
+const PRICE_FIND_RE = /(?:\d{1,3}(?:,\d{3})+|\d{4,6})(?:[.,]\d{1,2})?/g;
 const MIN_PRICE = 1000;
 const MAX_PRICE = 100000;
 const TICK_SIZE = 0.25;
@@ -21,8 +22,34 @@ function quarterTickAligned(price) {
   return Math.abs(ticks - Math.round(ticks)) <= 0.06 / TICK_SIZE;
 }
 
-export function parseHocrPriceSamples(hocr = '', imageHeight = 1) {
-  const out = [];
+function normalizeOcrToken(value = '') {
+  return stripTags(value)
+    .replace(/[Oo]/g, '0')
+    .replace(/[Il|]/g, '1')
+    .replace(/[’'`]/g, '')
+    .replace(/[;:]/g, '.')
+    .replace(/\s+/g, '');
+}
+
+function canonicalPriceText(raw = '') {
+  let text = normalizeOcrToken(raw);
+  if (/^\d{4,6},\d{1,2}$/.test(text)) {
+    const at = text.lastIndexOf(',');
+    text = `${text.slice(0, at)}.${text.slice(at + 1)}`;
+  }
+  return text;
+}
+
+function parsePrice(raw) {
+  const text = canonicalPriceText(raw);
+  if (!PRICE_RE.test(text)) return null;
+  const price = Number(text.replaceAll(',', ''));
+  if (!Number.isFinite(price) || price < MIN_PRICE || price > MAX_PRICE || !quarterTickAligned(price)) return null;
+  return { price, raw: text };
+}
+
+function parseWords(hocr = '') {
+  const words = [];
   const spanRe = /<span\b([^>]*)>([\s\S]*?)<\/span>/gi;
   for (const match of hocr.matchAll(spanRe)) {
     const attrs = match[1] || '';
@@ -30,25 +57,61 @@ export function parseHocrPriceSamples(hocr = '', imageHeight = 1) {
     const bbox = attrs.match(/bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i);
     if (!bbox) continue;
     const confidence = attrs.match(/x_wconf\s+(\d+)/i);
-    if (confidence && Number(confidence[1]) < 35) continue;
-
-    const raw = stripTags(match[2])
-      .replace(/[Oo]/g, '0')
-      .replace(/[Il]/g, '1')
-      .replace(/[’']/g, '')
-      .replace(/\s+/g, '');
-    if (!PRICE_RE.test(raw)) continue;
-    const price = Number(raw.replaceAll(',', ''));
-    if (!Number.isFinite(price) || price < MIN_PRICE || price > MAX_PRICE || !quarterTickAligned(price)) continue;
-    const y = ((Number(bbox[2]) + Number(bbox[4])) / 2) / Math.max(1, imageHeight);
-    if (!Number.isFinite(y) || y < 0 || y > 1) continue;
-    out.push({ y, price, raw });
+    const conf = confidence ? Number(confidence[1]) : 50;
+    if (conf < 22) continue;
+    const x0 = Number(bbox[1]), y0 = Number(bbox[2]), x1 = Number(bbox[3]), y1 = Number(bbox[4]);
+    if (![x0, y0, x1, y1].every(Number.isFinite) || x1 <= x0 || y1 <= y0) continue;
+    const text = normalizeOcrToken(match[2]);
+    if (!text) continue;
+    words.push({ x0, y0, x1, y1, cy: (y0 + y1) / 2, text, conf });
   }
+  return words;
+}
+
+function sampleFrom(raw, cy, imageHeight) {
+  const parsed = parsePrice(raw);
+  if (!parsed) return null;
+  const y = cy / Math.max(1, imageHeight);
+  if (!Number.isFinite(y) || y < 0 || y > 1) return null;
+  return { y, price: parsed.price, raw: parsed.raw };
+}
+
+export function parseHocrPriceSamples(hocr = '', imageHeight = 1) {
+  const words = parseWords(hocr);
+  const out = [];
+
+  for (const word of words) {
+    const direct = sampleFrom(word.text, word.cy, imageHeight);
+    if (direct) out.push(direct);
+  }
+
+  const tolerance = Math.max(4, imageHeight * 0.008);
+  const rows = [];
+  for (const word of [...words].sort((a, b) => a.cy - b.cy || a.x0 - b.x0)) {
+    let row = rows.find(r => Math.abs(r.cy - word.cy) <= tolerance);
+    if (!row) {
+      row = { cy: word.cy, words: [] };
+      rows.push(row);
+    }
+    row.words.push(word);
+    row.cy = row.words.reduce((s, x) => s + x.cy, 0) / row.words.length;
+  }
+
+  for (const row of rows) {
+    row.words.sort((a, b) => a.x0 - b.x0);
+    const compact = row.words.map(x => x.text).join('');
+    const matches = compact.match(PRICE_FIND_RE) || [];
+    for (const match of matches) {
+      const sample = sampleFrom(match, row.cy, imageHeight);
+      if (sample) out.push(sample);
+    }
+  }
+
   return dedupeSamples(out);
 }
 
 export function dedupeSamples(samples) {
-  const sorted = [...samples].sort((a, b) => a.y - b.y);
+  const sorted = [...samples].sort((a, b) => a.y - b.y || a.price - b.price);
   const out = [];
   for (const sample of sorted) {
     const dup = out.some(x => Math.abs(x.y - sample.y) < 0.004 && Math.abs(x.price - sample.price) < 0.26);
