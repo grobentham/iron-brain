@@ -1,8 +1,11 @@
-name: Deploy Iron Brain to GitHub Pages
+name: Deploy ICT Brain Web to GitHub Pages
 
 on:
   push:
     branches: ["main"]
+    paths:
+      - 'web/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -27,10 +30,10 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload static site
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload ICT Brain web app
+        uses: actions/upload-pages-artifact@v4
         with:
-          path: .
+          path: web
 
       - name: Deploy to GitHub Pages
         id: deployment
