@@ -9,12 +9,13 @@
 <body>
   <main>
     <header>
-      <div><p class="eyebrow">ICT BRAIN</p><h1>Live Bridge <span class="mini">v1.4</span></h1></div>
+      <div><p class="eyebrow">ICT BRAIN</p><h1>Live Bridge <span class="mini">v1.5</span></h1></div>
       <span id="browserState" class="badge on">READY</span>
     </header>
 
     <section class="card current">
       <div class="row between"><div><p class="label">Current tab</p><p id="currentTab" class="value">Checking…</p></div><span id="tabState" class="mini">—</span></div>
+      <p id="detectedMeta" class="hint">Detecting current chart…</p>
       <div class="grid2">
         <label>Instrument<select id="instrument"><option>AUTO</option><option>NQ</option><option>MNQ</option><option>ES</option></select></label>
         <label>Timeframe<select id="timeframe"><option>AUTO</option><option>1m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1H</option><option>4H</option><option>1D</option></select></label>
@@ -29,12 +30,12 @@
 
     <section class="card">
       <p class="label">How it works</p>
-      <p class="hint">The extension only reads the TradingView charts you connect. The ICT Brain website requests those captures and performs all analysis inside the browser.</p>
+      <p class="hint">The extension detects the live TradingView symbol and timeframe on every capture. The ICT Brain website requests those captures and performs all analysis inside the browser.</p>
       <p id="error" class="error"></p>
     </section>
 
     <p class="foot">No Vercel. No localhost server. No external AI/model API. No broker orders.</p>
   </main>
-  <script src="popup-v14.js"></script>
+  <script src="popup-v15.js"></script>
 </body>
 </html>

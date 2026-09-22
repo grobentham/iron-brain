@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ICT Brain Live Bridge",
-  "version": "1.4.0",
-  "description": "TradingView bridge for the browser-native ICT Brain website. No hosted backend, localhost service, or external model API.",
+  "version": "1.5.0",
+  "description": "TradingView bridge for the browser-native ICT Brain website with live symbol/timeframe detection and automatic browser analysis.",
   "permissions": [
     "storage",
     "tabs",
