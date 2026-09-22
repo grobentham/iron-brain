@@ -36,12 +36,16 @@ jobs:
         run: npm test
       - name: Native-only invariants
         run: |
-          grep -q "BACKEND_VERSION = '4.0.0'" api/analyze.js
+          grep -q "BACKEND_VERSION = '4.1.0'" api/analyze.js
           grep -q "externalInference: false" api/analyze.js
-          grep -q "native-deterministic-v4" api/analyze.js
+          grep -q "native-deterministic-v4.1" api/analyze.js
           grep -q "analyzeNativeShots" api/analyze.js
           grep -q "@tesseract.js-data/eng" package.json
           grep -q "langPath: ENG_DATA.langPath" api/analyze.js
+          grep -q "tessedit_char_whitelist" api/analyze.js
+          grep -q "leftFraction: 0.80" api/analyze.js
+          grep -q "leftFraction: 0.84" api/analyze.js
+          grep -q "PRICE_FIND_RE" lib/grounding.js
           grep -q "supportedNativeSetups" lib/native-engine.js
           grep -q "S01" lib/native-engine.js
           grep -q "S11" lib/native-engine.js
@@ -77,7 +81,7 @@ jobs:
           test -s vercel-app/api/analyze.js
           test -s vercel-app/lib/grounding.js
           test -s vercel-app/lib/native-engine.js
-          grep -q '"version": "4.0.0"' package.json
+          grep -q '"version": "4.1.0"' package.json
           grep -q "NO MODEL API" index.html
           grep -q "Run native analysis" index.html
           grep -q "externalInference === false" app.js
