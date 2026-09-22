@@ -1,0 +1,25 @@
+name: Package ICT Brain Live Bridge
+
+on:
+  pull_request:
+    paths:
+      - 'live-bridge/**'
+      - '.github/workflows/package-live-bridge.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create extension zip
+        run: zip -r ICT-Brain-Live-Bridge-v1.4.zip live-bridge
+      - name: Upload extension zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ICT-Brain-Live-Bridge-v1.4
+          path: ICT-Brain-Live-Bridge-v1.4.zip
+          if-no-files-found: error
+          retention-days: 7
