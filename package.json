@@ -1,11 +1,11 @@
 {
   "name": "ict-brain-native-web",
-  "version": "6.1.0",
+  "version": "6.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check api/analyze.js && node --check api/health.js && node --check api/strategy-knowledge.js && node --check app.js && node --check vercel-app/api/analyze.js && node --check vercel-app/api/strategy-knowledge.js && node --check vercel-app/lib/native-engine.js && node --check vercel-app/lib/time-axis-v6.js && node --check vercel-app/lib/market-model-v6.js && node --check vercel-app/lib/strategy-architect.js"
+    "check": "node --check api/analyze.js && node --check api/health.js && node --check api/strategy-knowledge.js && node --check app.js && node --check vercel-app/api/analyze.js && node --check vercel-app/api/analyze-v63.js && node --check vercel-app/api/strategy-knowledge.js && node --check vercel-app/lib/native-engine.js && node --check vercel-app/lib/time-axis-v6.js && node --check vercel-app/lib/cross-market-v6.js && node --check vercel-app/lib/market-model-v6.js && node --check vercel-app/lib/strategy-architect.js"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
