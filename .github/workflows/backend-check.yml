@@ -53,7 +53,8 @@ jobs:
           grep -q "fiveChartNativeMode: true" api/analyze-v64.js
           grep -q "attachStrategyLifecycle" api/analyze-v64.js
           grep -q "live-bridge-dom-price-axis" api/analyze-v64.js
-          grep -q "externalInference: false" api/analyze-v64.js
+          grep -q "authorized(req)" api/analyze-v64-entry.js
+          grep -q "limitFive(req)" api/analyze-v64-entry.js
           grep -q "buildSynchronizedSMT" lib/cross-market-v6.js
           grep -q "noAbsolutePriceComparisonAcrossMarkets" lib/cross-market-v6.js
           grep -q "buildUnifiedGraph" lib/market-model-v6.js
@@ -101,6 +102,7 @@ jobs:
           test -s vercel-app/api/analyze.js
           test -s vercel-app/api/analyze-v63.js
           test -s vercel-app/api/analyze-v64.js
+          test -s vercel-app/api/analyze-v64-entry.js
           test -s vercel-app/lib/grounding.js
           test -s vercel-app/lib/native-engine.js
           test -s vercel-app/lib/time-axis-v6.js
@@ -109,7 +111,7 @@ jobs:
           test -s vercel-app/lib/strategy-architect.js
           test -s vercel-app/lib/strategy-lifecycle-v6.js
           grep -q '"version": "6.4.0"' package.json
-          grep -Fq "export { default } from '../vercel-app/api/analyze-v64.js';" api/analyze.js
+          grep -Fq "export { default } from '../vercel-app/api/analyze-v64-entry.js';" api/analyze.js
           grep -q "NO MODEL API" index.html
           grep -q "externalInference === false" app.js
           grep -q '"maxDuration": 60' vercel.json
