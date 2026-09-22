@@ -1,12 +1,6 @@
-const VERSION = '3.1.0';
-const MODEL = process.env.ICT_BRAIN_MODEL || 'openai/gpt-5.6-sol';
-const DEFAULT_FALLBACKS = ['anthropic/claude-opus-5', 'google/gemini-3.6-flash'];
-const FALLBACK_MODELS = String(process.env.ICT_BRAIN_FALLBACK_MODELS || DEFAULT_FALLBACKS.join(','))
-  .split(',')
-  .map(x => x.trim())
-  .filter(Boolean)
-  .filter(x => x !== MODEL)
-  .slice(0, 3);
+import { supportedNativeSetups } from '../lib/native-engine.js';
+
+const VERSION = '4.0.0';
 
 export default function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -14,17 +8,22 @@ export default function handler(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.status(200).json({
     ok: true,
-    service: 'ICT Brain backend',
+    service: 'ICT Brain native backend',
     version: VERSION,
-    model: MODEL,
-    fallbackModels: FALLBACK_MODELS,
+    engine: 'native-deterministic-v4',
+    externalInference: false,
+    aiGateway: false,
+    externalModelApi: false,
     accessKeyRequired: Boolean(process.env.ICT_BRAIN_ACCESS_KEY),
     serverGrounding: true,
-    groundingMode: 'execution-chart-only-two-pass-ocr',
+    groundingMode: 'local-tesseract-price-axis + deterministic-pixel-candle-engine',
+    ocrLanguageData: 'bundled-npm-package',
+    supportedNativeSetups: supportedNativeSetups(),
+    blockedUntilNativeAlignmentIsCertified: ['S02', 'S03', 'S04', 'S08', 'S10'],
     maxScreenshots: 4,
     oneTradeOnly: true,
     failClosed: true,
     inMemoryResultCacheSeconds: 90,
-    bestEffortRateLimitPerFiveMinutes: Math.max(1, Number(process.env.ICT_BRAIN_RATE_LIMIT || 12)),
+    bestEffortRateLimitPerFiveMinutes: Math.max(1, Number(process.env.ICT_BRAIN_RATE_LIMIT || 18)),
   });
 }
