@@ -1,0 +1,61 @@
+name: Deploy ICT Brain Browser App to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - 'index.html'
+      - 'app.js'
+      - 'styles.css'
+      - 'browser-engine/**'
+      - 'vercel-app/lib/time-axis-v6.js'
+      - 'vercel-app/lib/cross-market-v6.js'
+      - 'vercel-app/lib/market-model-v6.js'
+      - 'vercel-app/lib/strategy-architect.js'
+      - 'vercel-app/lib/strategy-lifecycle-v6.js'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Build static browser app
+        run: |
+          mkdir -p _site/browser-engine _site/vercel-app/lib
+          cp index.html app.js styles.css _site/
+          cp browser-engine/*.js _site/browser-engine/
+          cp vercel-app/lib/time-axis-v6.js _site/vercel-app/lib/
+          cp vercel-app/lib/cross-market-v6.js _site/vercel-app/lib/
+          cp vercel-app/lib/market-model-v6.js _site/vercel-app/lib/
+          cp vercel-app/lib/strategy-architect.js _site/vercel-app/lib/
+          cp vercel-app/lib/strategy-lifecycle-v6.js _site/vercel-app/lib/
+          touch _site/.nojekyll
+      - name: Upload ICT Brain browser app
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
