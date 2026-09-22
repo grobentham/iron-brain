@@ -42,10 +42,10 @@ jobs:
           node --check local-engine/smoke-test.mjs
           node --check vercel-app/api/analyze-v64.js
           node --check vercel-app/lib/strategy-lifecycle-v6.js
-          if (Select-String -Path local-engine/server.mjs -Pattern "0.0.0.0") { throw 'Local engine must not bind to all interfaces.' }
-          Select-String -Path local-engine/server.mjs -Pattern "127.0.0.1"
-          Select-String -Path local-engine/server.mjs -Pattern "Access-Control-Allow-Private-Network"
-          Select-String -Path local-engine/server.mjs -Pattern "grobentham.github.io"
+          if (Select-String -Path local-engine/server.mjs -SimpleMatch -Pattern '0.0.0.0') { throw 'Local engine must not bind to all interfaces.' }
+          Select-String -Path local-engine/server.mjs -SimpleMatch -Pattern '127.0.0.1'
+          Select-String -Path local-engine/server.mjs -SimpleMatch -Pattern 'Access-Control-Allow-Private-Network'
+          Select-String -Path local-engine/server.mjs -SimpleMatch -Pattern 'grobentham.github.io'
 
       - name: Smoke test loopback server and browser CORS
         shell: powershell
