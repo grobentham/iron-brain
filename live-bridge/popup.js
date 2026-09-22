@@ -3,9 +3,7 @@ const $ = id => document.getElementById(id);
 let currentTab = null;
 let state = null;
 
-function send(message) {
-  return chrome.runtime.sendMessage(message);
-}
+function send(message) { return chrome.runtime.sendMessage(message); }
 
 function fmtTime(ms) {
   if (!ms) return 'Never';
@@ -21,8 +19,7 @@ function shortTitle(title) {
 function setBusy(busy, text = '') {
   $('scanBtn').disabled = busy;
   $('connectBtn').disabled = busy || !currentTab;
-  if (busy) $('scanBtn').textContent = text || 'Scanning…';
-  else $('scanBtn').textContent = 'Scan now';
+  $('scanBtn').textContent = busy ? (text || 'Scanning…') : 'Scan now';
 }
 
 function renderResult(result) {
@@ -30,6 +27,7 @@ function renderResult(result) {
   if (!result) {
     box.className = 'result wait';
     box.textContent = 'No scan yet.';
+    $('timeStatus').textContent = '';
     return;
   }
   const d = result.decision || 'WAIT';
@@ -38,6 +36,14 @@ function renderResult(result) {
     box.innerHTML = `${d} · ${result.instrument || ''} · ${result.setup || result.setupId || 'Strategy'}<span class="sub">Entry ${result.entry} · Stop ${result.stop} · Target ${result.target} · R:R ${result.rr ?? '—'}</span>`;
   } else {
     box.innerHTML = `WAIT<span class="sub">${result.reason || result.uncertainty?.[0] || 'No validated trade.'}</span>`;
+  }
+  const t = result?.timeAxis?.execution;
+  if (t?.strong) {
+    $('timeStatus').textContent = `Time axis Q${t.quality} · ${t.labels} labels · ${t.timezone || 'UNKNOWN'}${t.easternTimezoneCertified ? ' · Eastern certified' : ''}`;
+  } else if (t) {
+    $('timeStatus').textContent = `Time axis not certified${t.reason ? ` · ${t.reason}` : ''}`;
+  } else {
+    $('timeStatus').textContent = '';
   }
 }
 
@@ -49,7 +55,7 @@ function renderConnected() {
   if (!entries.length) {
     const empty = document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = 'No TradingView tabs connected yet.';
+    empty.textContent = state?.rememberedCharts?.length ? 'No live tab matched yet. Remembered chart connections will reconnect when TradingView loads.' : 'No TradingView tabs connected yet.';
     list.appendChild(empty);
     return;
   }
@@ -57,13 +63,14 @@ function renderConnected() {
     const row = document.createElement('div');
     row.className = 'connected-item';
     const info = document.createElement('div');
-    info.innerHTML = `<div class="connected-title">${shortTitle(config.title)}</div><div class="connected-meta">${config.instrument} · ${config.timeframe} · tab ${tabId}</div>`;
+    const reconnect = config.reconnected ? ' · auto-reconnected' : '';
+    info.innerHTML = `<div class="connected-title">${shortTitle(config.title)}</div><div class="connected-meta">${config.instrument} · ${config.timeframe} · tab ${tabId}${reconnect}</div>`;
     const btn = document.createElement('button');
     btn.className = 'disconnect';
     btn.textContent = 'Disconnect';
     btn.addEventListener('click', async () => {
       btn.disabled = true;
-      const res = await send({ type: 'ICT_DISCONNECT_TAB', tabId: Number(tabId) });
+      const res = await send({ type: 'ICT_DISCONNECT_TAB', tabId: Number(tabId), forget: true });
       if (res?.ok) { state = res.state; render(); }
       else $('error').textContent = res?.error || 'Could not disconnect tab.';
     });
@@ -94,6 +101,8 @@ function render() {
   $('accessKey').value = state.accessKey || '';
   $('backendUrl').value = state.backendUrl || 'https://iron-brain.vercel.app/api/analyze';
   $('scanTime').textContent = fmtTime(state.lastScanAt);
+  $('lifecycleState').textContent = state.lifecycle || 'WATCHING';
+  $('unchangedSkips').textContent = String(state.unchangedSkips || 0);
   $('error').textContent = state.lastError || '';
   renderConnected();
   renderCurrentTab();
@@ -113,19 +122,9 @@ $('connectBtn').addEventListener('click', async () => {
   if (!currentTab) return;
   $('error').textContent = '';
   $('connectBtn').disabled = true;
-  const res = await send({
-    type: 'ICT_CONNECT_TAB',
-    tabId: currentTab.id,
-    instrument: $('instrument').value,
-    timeframe: $('timeframe').value,
-  });
-  if (res?.ok) {
-    state = res.state;
-    render();
-  } else {
-    $('error').textContent = res?.error || 'Could not connect this tab.';
-    renderCurrentTab();
-  }
+  const res = await send({ type: 'ICT_CONNECT_TAB', tabId: currentTab.id, instrument: $('instrument').value, timeframe: $('timeframe').value });
+  if (res?.ok) { state = res.state; render(); }
+  else { $('error').textContent = res?.error || 'Could not connect this tab.'; renderCurrentTab(); }
 });
 
 $('monitorToggle').addEventListener('change', async () => {
@@ -136,11 +135,7 @@ $('monitorToggle').addEventListener('change', async () => {
 });
 
 $('interval').addEventListener('change', async () => {
-  if (!state?.enabled) {
-    state.intervalSec = Number($('interval').value);
-    render();
-    return;
-  }
+  if (!state?.enabled) { state.intervalSec = Number($('interval').value); render(); return; }
   const res = await send({ type: 'ICT_SET_MONITORING', enabled: true, intervalSec: Number($('interval').value) });
   if (res?.ok) { state = res.state; render(); }
   else $('error').textContent = res?.error || 'Could not change interval.';
@@ -159,11 +154,7 @@ $('scanBtn').addEventListener('click', async () => {
 
 $('saveSettingsBtn').addEventListener('click', async () => {
   $('error').textContent = '';
-  const res = await send({
-    type: 'ICT_SAVE_SETTINGS',
-    accessKey: $('accessKey').value,
-    backendUrl: $('backendUrl').value,
-  });
+  const res = await send({ type: 'ICT_SAVE_SETTINGS', accessKey: $('accessKey').value, backendUrl: $('backendUrl').value });
   if (res?.ok) {
     state = res.state;
     $('saveSettingsBtn').textContent = 'Saved';
