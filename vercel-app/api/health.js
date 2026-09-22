@@ -14,7 +14,7 @@ export default function handler(req, res) {
     ok: true,
     service: 'ICT Brain native backend',
     version: VERSION,
-    engine: 'native-perception-v4.2+time-axis-v6.1+market-model-v6+strategy-architect-v6',
+    engine: 'native-deterministic-v4.2+time-axis-v6.1+market-model-v6+strategy-architect-v6',
     strategyCreator: 'primitive-market-graph-strategy-creator-v6',
     strategyCreatorOwnsSelection: true,
     namedDetectorIndependent: true,
