@@ -1,11 +1,11 @@
 {
   "name": "ict-brain-native-web",
-  "version": "6.3.0",
+  "version": "6.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check api/analyze.js && node --check api/analyze-v63.js && node --check api/health.js && node --check api/strategy-knowledge.js && node --check app.js && node --check lib/native-engine.js && node --check lib/time-axis-v6.js && node --check lib/cross-market-v6.js && node --check lib/market-model-v6.js && node --check lib/strategy-architect.js"
+    "check": "node --check api/analyze.js && node --check api/analyze-v63.js && node --check api/analyze-v64.js && node --check api/analyze-v64-entry.js && node --check api/health.js && node --check api/strategy-knowledge.js && node --check app.js && node --check lib/native-engine.js && node --check lib/time-axis-v6.js && node --check lib/cross-market-v6.js && node --check lib/market-model-v6.js && node --check lib/strategy-architect.js && node --check lib/strategy-lifecycle-v6.js"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",

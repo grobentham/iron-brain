@@ -1,68 +1,46 @@
-# ICT Brain Live Bridge v1.1
+# ICT Brain Live Bridge v1.2
 
 Opera/Chromium extension that connects explicitly authorized TradingView tabs to the native ICT Brain backend.
 
-## What changed in v1.1
+## What changed in v1.2
 
-- Remembers chart connections across browser restarts and attempts to reconnect matching TradingView tabs automatically.
-- Uses change-aware scanning: scheduled scans hash each captured chart and skip the backend entirely when nothing changed.
-- Maintains a bounded local market journal and a simple live lifecycle state: `WATCHING`, `NEW_STRATEGY`, `STILL_VALID`, `NO_CURRENT_STRATEGY`.
-- Captures visible TradingView canvas layers plus visible DOM-rendered price/time-axis labels when available.
-- Sends deterministic time-axis hints, timezone hints, capture fingerprints, and capture metadata to ICT Brain v6.1.
-- The backend fits the visible time labels to candle X coordinates and validates the implied candle spacing against the declared timeframe before certifying the time axis.
-- Session-window logic still fails closed unless the chart explicitly exposes a certifiable timezone; NQ↔ES synchronized SMT is not yet enabled.
+- Connects up to **five** TradingView tabs so the full stack can be monitored together: `NQ 1H`, `NQ 15m`, `MNQ 5m`, `MNQ 1m`, `ES 1m`.
+- Five-chart requests are analyzed together by ICT Brain v6.4 instead of dropping a higher-timeframe chart to make room for ES.
+- Keeps synchronized NQ/MNQ↔ES SMT available on matching certified timeframes while preserving the 1H/15m/5m/1m market context.
+- Adds deterministic lifecycle reporting: `WATCHING`, `FORMING`, `CONFIRMED`, `ARMED`, `TRIGGERED`, `TARGET_HIT`, `INVALIDATED`, `EXPIRED`.
+- Dynamically recompresses connected chart captures in the extension service worker so a five-chart request stays within the backend upload budget.
+- Continues to remember chart connections, reconnect matching TradingView tabs, skip unchanged scans, and keep a bounded local market journal.
+- Never places broker orders and never calls ChatGPT, Gemini, Claude, Vercel AI Gateway, or another external model API.
 
-## Core behavior
-
-- Connect up to four TradingView tabs.
-- Recommended stack: NQ 1H, NQ 15m, MNQ 5m, MNQ 1m.
-- Run manually or every 30 seconds / 1 minute / 2 minutes / 5 minutes.
-- Send all changed connected charts in one backend request.
-- Show LONG / SHORT / WAIT and native time-axis status in the popup.
-- Notify only when a new fixed LONG/SHORT strategy signature appears.
-- Never place broker orders.
-- Never call ChatGPT, Gemini, Claude, Vercel AI Gateway, or another external model API.
-
-## Privacy / access model
-
-The extension only has host access to TradingView and the ICT Brain production domain. A TradingView chart must be explicitly connected before it can be remembered or scanned. It does not use TradingView private/internal APIs. It reads chart pixels and visible page labels already rendered in the authorized tab.
-
-The optional ICT Brain access key is stored in Chromium extension local storage and is sent only as the `x-ictbrain-key` header to the configured ICT Brain backend.
-
-## Install in Opera
-
-1. Download or clone this repository.
-2. Open `opera://extensions`.
-3. Enable **Developer mode**.
-4. Click **Load unpacked**.
-5. Select the `live-bridge` folder.
-6. Pin **ICT Brain Live Bridge** to the toolbar.
-
-After updating an already loaded unpacked extension, use the **Reload** button on `opera://extensions`.
-
-## Connect the recommended four-chart stack
-
-Open four TradingView tabs and connect each from the popup:
+## Recommended five-chart stack
 
 1. NQ — 1H
 2. NQ — 15m
 3. MNQ — 5m
 4. MNQ — 1m
+5. ES — 1m
 
-Then enable **Live Scan**. Scheduled scans compare capture fingerprints first. If every connected chart is unchanged, the backend request is skipped and the popup increments **Unchanged scans skipped**.
+The two 1-minute charts are synchronized only when both native time axes independently certify. SMT remains unavailable rather than guessed when alignment is weak.
 
-## Native time-axis behavior
+## Install / update in Opera
 
-Live Bridge collects visible clock labels such as `09:30`, `10:00`, etc. together with their horizontal positions. ICT Brain v6.1 then:
+1. Download or clone this repository.
+2. Open `opera://extensions`.
+3. Enable **Developer mode**.
+4. Click **Load unpacked** and select the `live-bridge` folder.
+5. If the extension was already loaded, press **Reload** after updating the files.
+6. Pin **ICT Brain Live Bridge** to the toolbar.
 
-1. parses usable clock labels;
-2. fits a deterministic X→time line;
-3. checks fit residuals and horizontal coverage;
-4. compares the implied minutes-per-candle with the declared timeframe;
-5. annotates reconstructed candles with chart-local times only when the calibration passes.
+Connect each TradingView chart from the popup, then enable **Live Scan**. Scheduled scans compare capture fingerprints first and do not call the backend when all connected charts are unchanged.
 
-The engine does not assume a New York timezone merely because the instrument is NQ/MNQ/ES. Eastern session rules require an explicit visible New York / EST / EDT timezone signal and otherwise remain disabled.
+## Lifecycle semantics
 
-## Remaining limitation
+`WATCHING` means no coherent strategy is active. `FORMING` means a deterministic hypothesis exists but has not passed all trade requirements. `CONFIRMED` means the creator and critic accepted the plan. `ARMED` means the accepted plan is close to its defined entry. In native five-chart mode, the backend can additionally distinguish entry interaction and terminal outcomes from reconstructed candle geometry; ambiguous same-candle stop/target ordering fails closed rather than inventing an outcome.
 
-TradingView layouts vary. Some labels can remain canvas-only or be virtualized, and background tabs can occasionally be discarded by Chromium. v1.1 detects these conditions and fails closed instead of inventing data. The next major step is synchronized NQ↔ES candle alignment and a full multi-timeframe live market graph.
+## Privacy / access model
+
+Only explicitly connected TradingView tabs are captured. The extension uses visible chart canvases and visible DOM-rendered labels; it does not use TradingView private/internal APIs. The optional ICT Brain access key is stored in Chromium extension local storage and sent only to the configured ICT Brain backend.
+
+## Remaining limitations
+
+TradingView layouts vary. Some labels can remain canvas-only or be virtualized, and Chromium can discard background tabs. Five-chart mode requires enough visible execution-chart price labels to ground Entry/SL/TP without guessing. Session-window rules still require explicit certified timezone evidence.

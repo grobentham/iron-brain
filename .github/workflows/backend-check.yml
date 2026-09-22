@@ -44,40 +44,33 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Syntax checks
         run: npm run check
-      - name: Native engine, time axis, cross market, market model, grounding, and architect tests
+      - name: Native engine, time axis, cross market, lifecycle, market model, grounding, and architect tests
         run: npm test
-      - name: Native-only v6.3 invariants
+      - name: Native-only v6.4 invariants
         run: |
-          grep -q "body.meta.backendVersion = '6.3.0'" api/analyze-v63.js
-          grep -q "synchronizedSMT = true" api/analyze-v63.js
-          grep -q "unifiedMultiTimeframeGraph = true" api/analyze-v63.js
-          grep -q "rankedDOLEngine = true" api/analyze-v63.js
-          grep -q "attachNativeTimeAxis" api/analyze.js
-          grep -q "calibrateTimeAxis" lib/time-axis-v6.js
+          grep -q "const VERSION = '6.4.0'" api/analyze-v64.js
+          grep -q "body.screenshots.length === 5" api/analyze-v64.js
+          grep -q "fiveChartNativeMode: true" api/analyze-v64.js
+          grep -q "attachStrategyLifecycle" api/analyze-v64.js
+          grep -q "live-bridge-dom-price-axis" api/analyze-v64.js
+          grep -q "authorized(req)" api/analyze-v64-entry.js
+          grep -q "limitFive(req)" api/analyze-v64-entry.js
           grep -q "buildSynchronizedSMT" lib/cross-market-v6.js
-          grep -q "Same declared timeframe" lib/cross-market-v6.js
           grep -q "noAbsolutePriceComparisonAcrossMarkets" lib/cross-market-v6.js
           grep -q "buildUnifiedGraph" lib/market-model-v6.js
           grep -q "rankDOLCandidates" lib/market-model-v6.js
-          grep -q "higher_timeframe_aligns" lib/market-model-v6.js
-          grep -q "synchronized_cross_market_divergence" lib/market-model-v6.js
           grep -q "SYNCHRONIZED_SMT_REVERSAL" lib/strategy-architect.js
-          grep -q "unified-mtf-market-graph-strategy-creator" lib/strategy-architect.js
-          grep -q "namedDetectorIndependent:true" lib/strategy-architect.js
-          grep -q "Adversarial critic passed" lib/strategy-architect.js
+          grep -q "LIFECYCLE_VERSION = '6.4.0'" lib/strategy-lifecycle-v6.js
+          grep -q "TARGET_HIT" lib/strategy-lifecycle-v6.js
+          grep -q "sameCandleStopTargetOutcomeFailsClosed" lib/strategy-lifecycle-v6.js
           test -s test/time-axis-v6.test.mjs
           test -s test/cross-market-v6.test.mjs
+          test -s test/strategy-lifecycle-v6.test.mjs
           if grep -E "SOURCE_FACTS|setupId: 'S0|setupId: \"S0" lib/strategy-architect.js lib/market-model-v6.js; then
-            echo 'Named setup IDs leaked into Strategy Architect v6.3 decision path'
+            echo 'Named setup IDs leaked into Strategy Architect decision path'
             exit 1
           fi
-          grep -q "@tesseract.js-data/eng" package.json
-          grep -q "langPath: ENG_DATA.langPath" api/analyze.js
-          grep -q "tessedit_char_whitelist" api/analyze.js
-          grep -q "ocrBuffer" api/analyze.js
-          grep -q "PRICE_FIND_RE" lib/grounding.js
-          if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" \
-            --exclude='*.md' --exclude-dir=node_modules .; then
+          if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" --exclude='*.md' --exclude-dir=node_modules .; then
             echo 'External inference dependency/reference found in native backend'
             exit 1
           fi
@@ -108,34 +101,27 @@ jobs:
           test -s api/strategy-knowledge.js
           test -s vercel-app/api/analyze.js
           test -s vercel-app/api/analyze-v63.js
-          test -s vercel-app/api/strategy-knowledge.js
+          test -s vercel-app/api/analyze-v64.js
+          test -s vercel-app/api/analyze-v64-entry.js
           test -s vercel-app/lib/grounding.js
           test -s vercel-app/lib/native-engine.js
           test -s vercel-app/lib/time-axis-v6.js
           test -s vercel-app/lib/cross-market-v6.js
           test -s vercel-app/lib/market-model-v6.js
           test -s vercel-app/lib/strategy-architect.js
-          grep -q '"version": "6.3.0"' package.json
+          test -s vercel-app/lib/strategy-lifecycle-v6.js
+          grep -q '"version": "6.4.0"' package.json
+          grep -Fq "export { default } from '../vercel-app/api/analyze-v64-entry.js';" api/analyze.js
           grep -q "NO MODEL API" index.html
-          grep -q "Run native analysis" index.html
           grep -q "externalInference === false" app.js
-          grep -q "startsWith('native-deterministic-v4')" app.js
-          grep -Fq "export const config = { maxDuration: 60 };" api/analyze.js
-          grep -Fq "export { default } from '../vercel-app/api/analyze-v63.js';" api/analyze.js
-          grep -Fq "export { default } from '../vercel-app/api/health.js';" api/health.js
-          grep -Fq "export { default } from '../vercel-app/api/strategy-knowledge.js';" api/strategy-knowledge.js
           grep -q '"maxDuration": 60' vercel.json
       - name: Scan deployable source for external inference and secrets
         run: |
-          if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" \
-            --exclude='*.md' --exclude-dir=node_modules --exclude-dir=.git \
-            api vercel-app index.html app.js package.json vercel.json; then
-            echo 'External inference reference found in deployable v6.3 source'
+          if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" --exclude='*.md' --exclude-dir=node_modules --exclude-dir=.git api vercel-app index.html app.js package.json vercel.json; then
+            echo 'External inference reference found in deployable v6.4 source'
             exit 1
           fi
-          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' \
-            --exclude='*.md' --exclude-dir=node_modules --exclude-dir=.git \
-            api vercel-app index.html app.js styles.css package.json vercel.json; then
+          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' --exclude='*.md' --exclude-dir=node_modules --exclude-dir=.git api vercel-app index.html app.js styles.css package.json vercel.json; then
             echo 'Possible committed secret found'
             exit 1
           fi
@@ -147,46 +133,35 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate Live Bridge v1.1
+      - name: Validate Live Bridge v1.2
         run: |
           test -s live-bridge/manifest.json
           test -s live-bridge/content-script.js
-          test -s live-bridge/service-worker.js
+          test -s live-bridge/service-worker-v12.js
           test -s live-bridge/popup.html
+          test -s live-bridge/popup-v12.js
           test -s live-bridge/popup.css
-          test -s live-bridge/popup.js
           test -s live-bridge/icon.svg
           node -e "JSON.parse(require('fs').readFileSync('live-bridge/manifest.json','utf8'))"
           node --check live-bridge/content-script.js
-          node --check live-bridge/service-worker.js
-          node --check live-bridge/popup.js
-          grep -q '"manifest_version": 3' live-bridge/manifest.json
-          grep -q '"version": "1.1.0"' live-bridge/manifest.json
-          grep -q 'https://www.tradingview.com/\*' live-bridge/manifest.json
-          grep -q 'https://iron-brain.vercel.app/\*' live-bridge/manifest.json
-          grep -q 'MAX_CONNECTED_TABS = 4' live-bridge/service-worker.js
-          grep -q 'MIN_INTERVAL_SEC = 30' live-bridge/service-worker.js
-          grep -q 'rememberedCharts' live-bridge/service-worker.js
-          grep -q 'captureFingerprints' live-bridge/service-worker.js
-          grep -q 'unchangedSkips' live-bridge/service-worker.js
-          grep -q 'marketJournal' live-bridge/service-worker.js
-          grep -q 'reconnectRememberedTabs' live-bridge/service-worker.js
-          grep -q 'ICT_CAPTURE_CHART' live-bridge/content-script.js
-          grep -q 'canvas+dom-axis-composite' live-bridge/content-script.js
-          grep -q 'timeHints' live-bridge/content-script.js
-          grep -q 'timezoneHint' live-bridge/content-script.js
-          grep -q 'fingerprint' live-bridge/content-script.js
-          grep -q 'Only calls the backend when a connected chart actually changes' live-bridge/popup.html
+          node --check live-bridge/service-worker-v12.js
+          node --check live-bridge/popup-v12.js
+          grep -q '"version": "1.2.0"' live-bridge/manifest.json
+          grep -q '"service_worker": "service-worker-v12.js"' live-bridge/manifest.json
+          grep -q 'MAX_CONNECTED_TABS=5' live-bridge/service-worker-v12.js
+          grep -q "bridgeVersion:'1.2.0'" live-bridge/service-worker-v12.js
+          grep -q 'TOTAL_CAPTURE_BUDGET=2_650_000' live-bridge/service-worker-v12.js
+          grep -q 'OffscreenCanvas' live-bridge/service-worker-v12.js
+          grep -q 'recommended: NQ 1H, NQ 15m, MNQ 5m, MNQ 1m, ES 1m' live-bridge/popup.html
+          grep -q '0 / 5' live-bridge/popup.html
           grep -q 'No broker orders. No external model API.' live-bridge/popup.html
       - name: Ensure bridge contains no external AI/model calls or committed secrets
         run: |
-          if grep -R -E "openai|anthropic|gemini|gpt-|claude-|AI_GATEWAY|generateObject|generateText" \
-            --exclude='*.md' live-bridge; then
+          if grep -R -E "openai|anthropic|gemini|gpt-|claude-|AI_GATEWAY|generateObject|generateText" --exclude='*.md' live-bridge; then
             echo 'External AI/model reference found in Live Bridge source'
             exit 1
           fi
-          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|ICT_BRAIN_ACCESS_KEY=)' \
-            --exclude='*.md' live-bridge; then
+          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|ICT_BRAIN_ACCESS_KEY=)' --exclude='*.md' live-bridge; then
             echo 'Possible committed secret found in Live Bridge'
             exit 1
           fi

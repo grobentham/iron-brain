@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ICT Brain Live Bridge",
-  "version": "1.1.0",
-  "description": "Persistent, change-aware TradingView monitoring for the native ICT Brain backend without external model APIs.",
+  "version": "1.2.0",
+  "description": "Five-chart TradingView monitoring with deterministic SMT, lifecycle tracking, and no external model APIs.",
   "permissions": [
     "storage",
     "tabs",
@@ -15,7 +15,7 @@
     "https://iron-brain.vercel.app/*"
   ],
   "background": {
-    "service_worker": "service-worker.js",
+    "service_worker": "service-worker-v12.js",
     "type": "module"
   },
   "action": {
