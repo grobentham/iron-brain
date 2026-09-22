@@ -9,75 +9,32 @@
 <body>
   <main>
     <header>
-      <div>
-        <p class="eyebrow">ICT BRAIN</p>
-        <h1>Live Bridge <span class="mini">v1.3</span></h1>
-      </div>
-      <span id="monitorBadge" class="badge off">OFF</span>
+      <div><p class="eyebrow">ICT BRAIN</p><h1>Live Bridge <span class="mini">v1.4</span></h1></div>
+      <span id="browserState" class="badge on">READY</span>
     </header>
 
     <section class="card current">
-      <div class="row between">
-        <div>
-          <p class="label">Current tab</p>
-          <p id="currentTab" class="value">Checking…</p>
-        </div>
-        <span id="tabState" class="mini">—</span>
-      </div>
+      <div class="row between"><div><p class="label">Current tab</p><p id="currentTab" class="value">Checking…</p></div><span id="tabState" class="mini">—</span></div>
       <div class="grid2">
-        <label>Instrument
-          <select id="instrument"><option>AUTO</option><option>NQ</option><option>MNQ</option><option>ES</option></select>
-        </label>
-        <label>Timeframe
-          <select id="timeframe"><option>AUTO</option><option>1m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1H</option><option>4H</option><option>1D</option></select>
-        </label>
+        <label>Instrument<select id="instrument"><option>AUTO</option><option>NQ</option><option>MNQ</option><option>ES</option></select></label>
+        <label>Timeframe<select id="timeframe"><option>AUTO</option><option>1m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1H</option><option>4H</option><option>1D</option></select></label>
       </div>
-      <button id="connectBtn" class="primary">Connect current TradingView tab</button>
+      <button id="connectBtn" class="primary">Connect current TradingView chart</button>
     </section>
 
     <section class="card">
-      <div class="row between">
-        <div>
-          <p class="label">Connected charts</p>
-          <p class="hint">Up to 5 TradingView tabs · recommended: NQ 1H, NQ 15m, MNQ 5m, MNQ 1m, ES 1m</p>
-        </div>
-        <span id="connectedCount" class="counter">0 / 5</span>
-      </div>
+      <div class="row between"><div><p class="label">Connected charts</p><p class="hint">Recommended: NQ 1H, NQ 15m, MNQ 5m, MNQ 1m, ES 1m</p></div><span id="connectedCount" class="counter">0 / 5</span></div>
       <div id="connectedList" class="connected-list"></div>
     </section>
 
     <section class="card">
-      <div class="row between">
-        <div><p class="label">Live Scan</p><p class="hint">The hosted ICT Brain backend analyzes only when a connected chart changes.</p></div>
-        <label class="switch"><input id="monitorToggle" type="checkbox" /><span></span></label>
-      </div>
-      <div class="row between"><span class="hint">Lifecycle</span><span id="lifecycleState" class="mini">WATCHING</span></div>
-      <div class="row between"><span class="hint">Unchanged scans skipped</span><span id="unchangedSkips" class="mini">0</span></div>
-      <label>Scan interval
-        <select id="interval"><option value="30">30 seconds</option><option value="60">1 minute</option><option value="120">2 minutes</option><option value="300">5 minutes</option></select>
-      </label>
-      <button id="scanBtn" class="secondary">Scan now</button>
-    </section>
-
-    <section class="card result-card">
-      <div class="row between"><p class="label">Latest result</p><span id="scanTime" class="mini">Never</span></div>
-      <div id="result" class="result wait">No scan yet.</div>
-      <p id="lifecycleDetail" class="hint"></p>
-      <p id="timeStatus" class="hint"></p>
-      <p id="marketStatus" class="hint"></p>
+      <p class="label">How it works</p>
+      <p class="hint">The extension only reads the TradingView charts you connect. The ICT Brain website requests those captures and performs all analysis inside the browser.</p>
       <p id="error" class="error"></p>
     </section>
 
-    <details class="card settings">
-      <summary>Private access</summary>
-      <label>ICT Brain access key
-        <input id="accessKey" type="password" autocomplete="off" placeholder="Leave blank unless private access is enabled" />
-      </label>
-      <button id="saveSettingsBtn" class="secondary">Save access key</button>
-    </details>
-
-    <p class="foot">TradingView → Live Bridge → hosted ICT Brain web app. No broker orders. No external model API.</p>
+    <p class="foot">No Vercel. No localhost server. No external AI/model API. No broker orders.</p>
   </main>
-  <script src="popup-v13.js"></script>
+  <script src="popup-v14.js"></script>
 </body>
 </html>
