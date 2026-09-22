@@ -21,36 +21,158 @@ function overlapOrNear(a, b, pad = 140) {
   return !(a.right + pad < b.left || b.right + pad < a.left || a.bottom + pad < b.top || b.bottom + pad < a.top);
 }
 
-function detectInstrument() {
-  const chunks = [document.title];
-  for (const el of document.querySelectorAll('button,[role="button"],[aria-label],[title]')) {
-    const t = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('title') || ''} ${el.textContent || ''}`.trim();
-    if (t) chunks.push(t);
-    if (chunks.join(' ').length > 12000) break;
-  }
-  const text = chunks.join(' ').toUpperCase();
-  if (/\bMNQ(?:1!|[A-Z]\d{1,2})?\b/.test(text)) return 'MNQ';
-  if (/\bNQ(?:1!|[A-Z]\d{1,2})?\b/.test(text)) return 'NQ';
-  if (/\bES(?:1!|[A-Z]\d{1,2})?\b/.test(text)) return 'ES';
-  return 'AUTO';
+function elementText(el) {
+  if (!el) return '';
+  return [
+    el.textContent,
+    el.getAttribute?.('aria-label'),
+    el.getAttribute?.('title'),
+    el.getAttribute?.('data-value'),
+    el.getAttribute?.('data-name'),
+    el.getAttribute?.('data-tooltip'),
+  ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 }
 
-function detectTimeframe() {
-  const values = [];
-  for (const el of document.querySelectorAll('button,[role="button"],[aria-label],[title]')) {
-    const t = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('title') || ''} ${el.textContent || ''}`.trim();
-    if (t && t.length <= 140) values.push(t);
-    if (values.length > 260) break;
-  }
-  const text = values.join(' | ');
-  const exacts = [
-    [/\b1\s*(?:minute|min|m)\b/i, '1m'], [/\b3\s*(?:minute|min|m)\b/i, '3m'], [/\b5\s*(?:minute|min|m)\b/i, '5m'],
-    [/\b15\s*(?:minute|min|m)\b/i, '15m'], [/\b30\s*(?:minute|min|m)\b/i, '30m'], [/\b1\s*(?:hour|hr|h)\b/i, '1H'],
-    [/\b4\s*(?:hour|hr|h)\b/i, '4H'], [/\b1\s*(?:day|d)\b/i, '1D'],
-  ];
-  for (const [re, tf] of exacts) if (re.test(text)) return tf;
-  return 'AUTO';
+function parseInstrumentText(raw) {
+  const text = String(raw || '').toUpperCase().replace(/\u00A0/g, ' ');
+  const futureSuffix = '(?:1!|[FGHJKMNQUVXZ]\\d{1,4})?';
+  const token = symbol => new RegExp(`(?:^|[^A-Z0-9])${symbol}${futureSuffix}(?=$|[^A-Z0-9])`, 'i');
+  if (token('MNQ').test(text) || /MICRO\s+E-?MINI\s+NASDAQ(?:-?100)?/.test(text)) return 'MNQ';
+  if (token('NQ').test(text) || /(?:^|\b)E-?MINI\s+NASDAQ(?:-?100)?/.test(text)) return 'NQ';
+  if (token('ES').test(text) || /(?:^|\b)E-?MINI\s+S&P\s*500/.test(text)) return 'ES';
+  return null;
 }
+
+function detectInstrumentDetailed() {
+  const candidates = [{ text: document.title, score: 120, source: 'document-title' }];
+  const selectors = [
+    'button[data-name="header-toolbar-symbol-search"]',
+    '[data-name="header-toolbar-symbol-search"]',
+    '[data-name="legend-source-title"]',
+    '[data-name="legend-source-description"]',
+    '[class*="symbolTitle"]',
+    '[class*="titleWrapper"]',
+  ];
+  for (const selector of selectors) {
+    for (const el of document.querySelectorAll(selector)) {
+      if (!isVisibleElement(el)) continue;
+      const text = elementText(el);
+      if (text) candidates.push({ text, score: 110, source: selector });
+    }
+  }
+  for (const el of document.querySelectorAll('[aria-label],[title]')) {
+    if (!isVisibleElement(el)) continue;
+    const meta = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('title') || ''}`;
+    if (!/symbol|ticker|instrument/i.test(meta)) continue;
+    const text = elementText(el);
+    if (text) candidates.push({ text, score: 90, source: 'symbol-accessibility' });
+    if (candidates.length > 60) break;
+  }
+  for (const el of document.querySelectorAll('button,span,div')) {
+    if (!isVisibleElement(el)) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.top > 180 || rect.left > Math.min(innerWidth * .55, 760) || rect.width > 520 || rect.height > 90) continue;
+    const text = elementText(el);
+    if (parseInstrumentText(text)) candidates.push({ text, score: 45, source: 'chart-header-fallback' });
+    if (candidates.length > 100) break;
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  for (const candidate of candidates) {
+    const instrument = parseInstrumentText(candidate.text);
+    if (instrument) return { instrument, source: candidate.source, text: candidate.text.slice(0, 120) };
+  }
+  return { instrument: 'AUTO', source: 'none', text: '' };
+}
+
+function parseTimeframeText(raw, allowBare = false) {
+  const original = String(raw || '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!original) return null;
+  const text = original.toLowerCase();
+  const explicit = [
+    [/\b1\s*(?:m|min|mins|minute|minutes)\b/i, '1m'],
+    [/\b3\s*(?:m|min|mins|minute|minutes)\b/i, '3m'],
+    [/\b5\s*(?:m|min|mins|minute|minutes)\b/i, '5m'],
+    [/\b15\s*(?:m|min|mins|minute|minutes)\b/i, '15m'],
+    [/\b30\s*(?:m|min|mins|minute|minutes)\b/i, '30m'],
+    [/\b(?:1\s*(?:h|hr|hrs|hour|hours)|60\s*(?:m|min|mins|minute|minutes))\b/i, '1H'],
+    [/\b(?:4\s*(?:h|hr|hrs|hour|hours)|240\s*(?:m|min|mins|minute|minutes))\b/i, '4H'],
+    [/\b1\s*(?:d|day|days)\b/i, '1D'],
+  ];
+  for (const [re, tf] of explicit) if (re.test(text)) return tf;
+  if (/^1m$/.test(original)) return '1m';
+  if (/^3m$/.test(original)) return '3m';
+  if (/^5m$/.test(original)) return '5m';
+  if (/^15m$/.test(original)) return '15m';
+  if (/^30m$/.test(original)) return '30m';
+  if (/^(?:1h|60m)$/i.test(original)) return '1H';
+  if (/^(?:4h|240m)$/i.test(original)) return '4H';
+  if (/^(?:1d|d)$/i.test(original)) return '1D';
+  if (allowBare) {
+    const bare = original.match(/(?:^|\s)(1|3|5|15|30|60|240|D)(?:\s|$)/i)?.[1]?.toUpperCase();
+    return ({ '1':'1m', '3':'3m', '5':'5m', '15':'15m', '30':'30m', '60':'1H', '240':'4H', 'D':'1D' })[bare] || null;
+  }
+  return null;
+}
+
+function timeframeElementScore(el) {
+  let score = 0;
+  const name = `${el.getAttribute?.('data-name') || ''} ${el.getAttribute?.('aria-label') || ''} ${el.getAttribute?.('title') || ''}`;
+  if (/header-toolbar-intervals/i.test(name)) score += 120;
+  else if (/interval|timeframe|time frame|resolution/i.test(name)) score += 75;
+  if (el.getAttribute?.('aria-pressed') === 'true' || el.getAttribute?.('aria-current') === 'true') score += 70;
+  const cls = String(el.className || '');
+  if (/selected|active|highlight|checked/i.test(cls)) score += 35;
+  const rect = el.getBoundingClientRect();
+  if (rect.top <= 150) score += 20;
+  if (rect.width <= 220 && rect.height <= 90) score += 10;
+  return score;
+}
+
+function detectTimeframeDetailed() {
+  const candidates = [];
+  const selectors = [
+    'button[data-name="header-toolbar-intervals"]',
+    '[data-name="header-toolbar-intervals"] button',
+    '[data-name="header-toolbar-intervals"]',
+    '[data-name*="interval"]',
+    '[aria-pressed="true"]',
+    '[aria-current="true"]',
+    '[aria-label*="interval"]',
+    '[aria-label*="timeframe"]',
+    '[title*="interval"]',
+  ];
+  const seen = new Set();
+  for (const selector of selectors) {
+    let nodes = [];
+    try { nodes = [...document.querySelectorAll(selector)]; } catch {}
+    for (const el of nodes) {
+      if (seen.has(el) || !isVisibleElement(el)) continue;
+      seen.add(el);
+      const score = timeframeElementScore(el);
+      const text = elementText(el);
+      const timeframe = parseTimeframeText(text, score >= 80);
+      if (timeframe) candidates.push({ timeframe, score, source: selector, text: text.slice(0, 120) });
+    }
+  }
+  const titleTf = parseTimeframeText(document.title, false);
+  if (titleTf) candidates.push({ timeframe: titleTf, score: 65, source: 'document-title', text: document.title.slice(0, 120) });
+  if (!candidates.length) {
+    for (const el of document.querySelectorAll('button,[role="button"]')) {
+      if (!isVisibleElement(el)) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.top > 150 || rect.width > 220 || rect.height > 90) continue;
+      const score = timeframeElementScore(el);
+      const text = elementText(el);
+      const timeframe = parseTimeframeText(text, score >= 55);
+      if (timeframe) candidates.push({ timeframe, score: Math.max(score, 30), source: 'top-toolbar-fallback', text: text.slice(0, 120) });
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0] || { timeframe: 'AUTO', score: 0, source: 'none', text: '' };
+}
+
+function detectInstrument() { return detectInstrumentDetailed().instrument; }
+function detectTimeframe() { return detectTimeframeDetailed().timeframe; }
 
 function estimateDataUrlBytes(dataUrl) {
   const comma = dataUrl.indexOf(',');
@@ -189,6 +311,8 @@ function captureTradingViewCanvases() {
   const timezoneHint = axisLabels.find(x => x.kind === 'timezone')?.text || '';
   const timeHints = axisLabels.filter(x => x.kind === 'time' || x.kind === 'date').slice(0, 40);
   const priceHints = axisLabels.filter(x => x.kind === 'price').slice(0, 30);
+  const instrumentInfo = detectInstrumentDetailed();
+  const timeframeInfo = detectTimeframeDetailed();
 
   return {
     ...encoded,
@@ -196,8 +320,14 @@ function captureTradingViewCanvases() {
     layers: drawn,
     domAxisLabels: axisLabels.length,
     title: document.title,
-    instrumentDetected: detectInstrument(),
-    timeframeDetected: detectTimeframe(),
+    instrumentDetected: instrumentInfo.instrument,
+    timeframeDetected: timeframeInfo.timeframe,
+    detection: {
+      instrumentSource: instrumentInfo.source,
+      timeframeSource: timeframeInfo.source,
+      instrumentText: instrumentInfo.text,
+      timeframeText: timeframeInfo.text,
+    },
     capturedAt: Date.now(),
     timeHints,
     priceHints,
@@ -213,7 +343,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message?.type === 'ICT_BRIDGE_PING') {
-    sendResponse({ ok: true, title: document.title, instrumentDetected: detectInstrument(), timeframeDetected: detectTimeframe() });
+    const instrumentInfo = detectInstrumentDetailed();
+    const timeframeInfo = detectTimeframeDetailed();
+    sendResponse({
+      ok: true,
+      title: document.title,
+      instrumentDetected: instrumentInfo.instrument,
+      timeframeDetected: timeframeInfo.timeframe,
+      detection: {
+        instrumentSource: instrumentInfo.source,
+        timeframeSource: timeframeInfo.source,
+        instrumentText: instrumentInfo.text,
+        timeframeText: timeframeInfo.text,
+      },
+    });
     return true;
   }
   return false;
