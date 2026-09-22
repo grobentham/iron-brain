@@ -114,6 +114,8 @@ jobs:
           grep -Fq "export { default } from '../vercel-app/api/analyze-v64-entry.js';" api/analyze.js
           grep -q "NO MODEL API" index.html
           grep -q "externalInference === false" app.js
+          grep -q "targetAddressSpace = 'loopback'" app.js
+          grep -q "http://127.0.0.1:8787" app.js
           grep -q '"maxDuration": 60' vercel.json
       - name: Scan deployable source for external inference and secrets
         run: |
@@ -133,11 +135,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate Live Bridge v1.2
+      - name: Validate Live Bridge v1.2.1 local-engine routing
         run: |
           test -s live-bridge/manifest.json
           test -s live-bridge/content-script.js
           test -s live-bridge/service-worker-v12.js
+          test -s live-bridge/service-worker-local.js
           test -s live-bridge/popup.html
           test -s live-bridge/popup-v12.js
           test -s live-bridge/popup.css
@@ -145,9 +148,12 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync('live-bridge/manifest.json','utf8'))"
           node --check live-bridge/content-script.js
           node --check live-bridge/service-worker-v12.js
+          node --check live-bridge/service-worker-local.js
           node --check live-bridge/popup-v12.js
-          grep -q '"version": "1.2.0"' live-bridge/manifest.json
-          grep -q '"service_worker": "service-worker-v12.js"' live-bridge/manifest.json
+          grep -q '"version": "1.2.1"' live-bridge/manifest.json
+          grep -q '"service_worker": "service-worker-local.js"' live-bridge/manifest.json
+          grep -q 'http://127.0.0.1:8787/\*' live-bridge/manifest.json
+          grep -q "LOCAL_BACKEND = 'http://127.0.0.1:8787/analyze'" live-bridge/service-worker-local.js
           grep -q 'MAX_CONNECTED_TABS=5' live-bridge/service-worker-v12.js
           grep -q "bridgeVersion:'1.2.0'" live-bridge/service-worker-v12.js
           grep -q 'TOTAL_CAPTURE_BUDGET=2_650_000' live-bridge/service-worker-v12.js
