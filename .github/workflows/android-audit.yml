@@ -44,6 +44,28 @@ jobs:
         working-directory: android
         run: gradle :app:assembleDebug :app:lintDebug --stacktrace
 
+      - name: Verify v2.1 grounding source invariants
+        run: |
+          SRC=android/app/src/main/java/com/ictbrain/analyzer/MainActivity.java
+          GROUND=android/app/src/main/java/com/ictbrain/analyzer/PriceGrounder.java
+          grep -q 'ICT Brain Android v2.1.0' "$SRC"
+          grep -q '"entry_y"' "$SRC"
+          grep -q 'execution_chart' "$SRC"
+          grep -q 'PriceGrounder.calibrate' "$SRC"
+          grep -q 'priceForPermille' "$SRC"
+          grep -q 'Last analysis failed' "$SRC"
+          grep -q 'TextRecognition.getClient' "$GROUND"
+          grep -q 'MIN_R2 = 0.985' "$GROUND"
+          grep -q 'inliers.size() < 3' "$GROUND"
+          if grep -q 'applyRecommendedLabels' "$SRC"; then
+            echo 'Unsafe automatic instrument/timeframe labeling still exists'
+            exit 1
+          fi
+          if grep -q 'double entry = tick(o.getDouble("entry"))' "$SRC"; then
+            echo 'Model-authored prices are still being trusted'
+            exit 1
+          fi
+
       - name: Verify signing and manifest
         run: |
           APK=android/app/build/outputs/apk/debug/app-debug.apk
@@ -51,13 +73,21 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/signing.txt
           "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$APK" | tee /tmp/badging.txt
           "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump permissions "$APK" | tee /tmp/permissions.txt
+          grep -q "package: name='com.ictbrain.analyzer'" /tmp/badging.txt
+          grep -q "versionName='2.1.0'" /tmp/badging.txt
           unzip -t "$APK" | tee /tmp/ziptest.txt
           sha256sum "$APK" | tee /tmp/sha256.txt
 
-      - name: Reject unexpected dangerous/network permissions
+      - name: Audit merged permissions
         run: |
-          if grep -E "android.permission.(INTERNET|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|CAMERA|RECORD_AUDIO|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION)" /tmp/permissions.txt; then
-            echo "Unexpected sensitive/network permission found"
+          # AICore/ML Kit dependencies legitimately merge INTERNET and ACCESS_NETWORK_STATE
+          # for model/config delivery. They are expected and are not used by this app to
+          # send screenshots to an external AI API.
+          grep -q "com.google.android.apps.aicore.service.BIND_SERVICE" /tmp/permissions.txt
+          grep -q "android.permission.INTERNET" /tmp/permissions.txt
+          grep -q "android.permission.ACCESS_NETWORK_STATE" /tmp/permissions.txt
+          if grep -E "android.permission.(READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|READ_MEDIA_IMAGES|CAMERA|RECORD_AUDIO|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION)" /tmp/permissions.txt; then
+            echo "Unexpected sensitive permission found"
             exit 1
           fi
 
@@ -65,7 +95,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk-audit-reports
+          name: android-apk-audit-reports-v2.1
           path: |
             /tmp/signing.txt
             /tmp/badging.txt
