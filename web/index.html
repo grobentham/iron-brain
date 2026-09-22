@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f4f1e9" />
+  <title>ICT Brain — One Trade</title>
+  <meta name="description" content="Private, browser-based ICT chart analysis. Up to four screenshots. One fixed trade or WAIT." />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="page-shell">
+    <header class="masthead">
+      <div class="brand">ICT BRAIN</div>
+      <div class="pill" id="aiStatus">Checking local AI…</div>
+    </header>
+
+    <section class="hero">
+      <p class="eyebrow">PRIVATE · ON-DEVICE · WEB</p>
+      <h1>See the chart.<br />Find one trade.</h1>
+      <p class="lede">Add up to four chart screenshots. The browser reads the visible price scale locally, asks Chrome’s built-in on-device model to identify one setup, then validates the prices itself.</p>
+    </section>
+
+    <section class="section-block">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">01</p>
+          <h2>Your charts</h2>
+        </div>
+        <span class="muted" id="countLabel">0 of 4</span>
+      </div>
+
+      <label class="upload-box" for="fileInput">
+        <span class="upload-title">Choose screenshots</span>
+        <span class="upload-sub">PNG, JPG or WEBP · up to 4 images</span>
+      </label>
+      <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden />
+      <p class="microcopy">Recommended: 1H NQ · 15m NQ · 5m MNQ · 1m MNQ. Keep the right-hand price scale visible.</p>
+      <div id="shots" class="shots-grid"></div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">02</p>
+          <h2>Context</h2>
+        </div>
+      </div>
+      <textarea id="contextInput" rows="3" maxlength="500" placeholder="Optional — e.g. NY session, looking for 10AM manipulation"></textarea>
+      <p class="microcopy">Context is treated as untrusted context only. It cannot override the app’s analysis rules.</p>
+    </section>
+
+    <section class="section-block action-block">
+      <button id="analyzeButton" class="primary-button" disabled>Find one grounded trade</button>
+      <div id="progress" class="progress-wrap" hidden>
+        <div class="spinner" aria-hidden="true"></div>
+        <p id="progressText">Preparing analysis…</p>
+      </div>
+    </section>
+
+    <section id="resultSection" class="result-panel" hidden aria-live="polite"></section>
+
+    <footer class="footer">
+      <p class="eyebrow">PRIVATE BY DESIGN</p>
+      <p>Images are processed locally by the page. The AI step uses Chrome’s built-in Prompt API when available. This site contains no OpenAI, Google Gemini API, broker API or secret key.</p>
+      <p class="muted">For research only. Confidence describes screenshot evidence quality, not win probability.</p>
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js" integrity="sha384-" crossorigin="anonymous" onerror="this.removeAttribute('integrity')"></script>
+  <script src="./app.js" defer></script>
+</body>
+</html>
