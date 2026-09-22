@@ -1,50 +1,32 @@
-# ICT Brain Backend Web v3.0
+# ICT Brain v4 — Native Analysis Engine
 
-Server-backed web version of ICT Brain.
+ICT Brain v4 is a server-side screenshot analysis tool for NQ/MNQ/ES futures.
 
-## Architecture
+## Core architecture
 
-Browser responsibilities are intentionally small: select 1–4 screenshots, optionally label instrument/timeframe, resize them for transport, and render the response.
+The production analysis path is self-contained software. It does **not** call ChatGPT, OpenAI, Gemini, Claude, Vercel AI Gateway, or another external inference API.
 
-The Vercel backend performs:
+Pipeline:
 
-1. strict input/type/count/size validation;
-2. image normalization with `sharp`;
-3. independent OCR of the visible right-side price scale with `tesseract.js`;
-4. robust price-axis calibration with outlier rejection;
-5. multimodal chart reasoning through Vercel AI Gateway;
-6. local conversion of model visual Y anchors into actual prices;
-7. NQ/MNQ 0.25 tick rounding;
-8. LONG/SHORT geometry and risk/reward validation;
-9. one-trade-only output enforcement;
-10. safe `WAIT` when any required evidence/grounding step fails.
+1. Browser compresses and uploads 1–4 screenshots.
+2. `sharp` normalizes the images in the Vercel function.
+3. The native pixel engine reconstructs a candlestick series from chart geometry.
+4. Deterministic structure code derives swings, liquidity raids, displacement, structural shifts, FVGs, breaker retests, rejection signals and multi-timeframe bias.
+5. Local Tesseract OCR reads the execution chart's right-side price scale. English trained data is bundled through `@tesseract.js-data/eng`, so the backend does not depend on a runtime language-data CDN.
+6. Local grounding converts screenshot Y positions into actual prices and validates entry/stop/target geometry and R:R.
+7. The backend returns exactly one LONG, SHORT, or WAIT result.
 
-The model is never asked to author numeric Entry / Stop / Take Profit values. It returns visual Y-permille anchors only. The backend derives prices independently.
+## Native setup coverage in v4.0
 
-## AI authentication
+Executable now: S01, S05, S06, S09, S11, S12.
 
-On Vercel, the AI SDK can use the deployment OIDC identity with AI Gateway. No browser API secret is required. The default model is `openai/gpt-5.6-sol`; override it with `ICT_BRAIN_MODEL` if desired.
+Fail-closed for now: S02 SMT and time-window-dependent S03/S04/S10, plus S08 session sequencing, until native timestamp/cross-market alignment extraction is certified. The engine does not invent those setups.
 
-## Optional private access key
+## Safety boundaries
 
-Set `ICT_BRAIN_ACCESS_KEY` as a Vercel environment variable to require a personal key for `/api/analyze`. The browser has a private-access field and stores the key only in localStorage. Never commit the key to GitHub.
-
-## Privacy
-
-ICT Brain does not intentionally persist screenshots. Images are accepted by the serverless function, processed in memory, sent to the configured AI model through Vercel AI Gateway for inference, and discarded when the request ends. Platform/provider operational logging and retention are governed by their policies; `disallowPromptTraining` is requested through AI Gateway.
-
-## Run checks
-
-```bash
-npm install
-npm run check
-npm test
-```
-
-## Vercel project
-
-Deploy this directory as the Vercel project root:
-
-`vercel-app`
-
-The public site and `/api/*` backend then share one origin, so there is no CORS or exposed backend URL configuration.
+- One direction, one setup, one entry, one stop, one target.
+- No TP2/TP3, runner, scale-in, backup entry, second-best trade, or alternative direction.
+- Screenshots are processed in memory and are not intentionally stored by ICT Brain.
+- No broker connectivity or order placement.
+- Confidence is deterministic visible-evidence quality, not win probability.
+- If candle reconstruction, setup evidence, OCR price grounding, or trade geometry is weak, the result is WAIT.
