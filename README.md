@@ -1,46 +1,36 @@
-# Iron Brain — MNQ Quant Intelligence Terminal
+# ICT Brain v4 — Native Analysis Engine
 
-Iron Brain UI v0.1 is the visual command-center prototype for the MNQ quant system.
+ICT Brain v4 is a server-side screenshot analysis tool for NQ/MNQ/ES futures.
 
-## Current milestone
+## Core architecture
 
-- Cinematic central brain interface
-- Animated white neural pathways
-- Technical / Cross-Market / Macro / News / Fair Value / Microstructure / Risk / Execution module activity
-- LONG / SHORT / WAIT / DO NOT TRADE visual states
-- Decision reasons and veto-first trace
-- Simulated MNQ price/chart/intelligence feed
-- Read-only simulation: no broker connectivity and no order placement
+The production analysis path is self-contained software. It does **not** call ChatGPT, OpenAI, Gemini, Claude, Vercel AI Gateway, or another external inference API.
 
-## Safety boundary
+Pipeline:
 
-This repository contains the **frontend prototype only**. It does not contain private broker credentials and does not authorize or place trades. The frozen V13.5.8 quant engine remains separate.
+1. Browser compresses and uploads 1–4 screenshots.
+2. `sharp` normalizes the images in the Vercel function.
+3. The native pixel engine reconstructs a candlestick series from chart geometry.
+4. Deterministic structure code derives swings, liquidity raids, displacement, structural shifts, FVGs, breaker retests, rejection signals and multi-timeframe bias.
+5. Local Tesseract OCR reads the execution chart's right-side price scale. English trained data is bundled through `@tesseract.js-data/eng`, so the backend does not depend on a runtime language-data CDN.
+6. Local grounding converts screenshot Y positions into actual prices and validates entry/stop/target geometry and R:R.
+7. The backend returns exactly one LONG, SHORT, or WAIT result.
 
-Fair Value and Microstructure deliberately appear unavailable when their legitimate inputs are absent rather than being fabricated.
+## Native setup coverage in v4.0
 
-## GitHub Pages
+Executable now: S01, S05, S06, S09, S11, S12.
 
-This repository is ready for GitHub Pages using the included `.github/workflows/pages.yml` workflow.
+Fail-closed for now: S02 SMT and time-window-dependent S03/S04/S10, plus S08 session sequencing, until native timestamp/cross-market alignment extraction is certified. The engine does not invent those setups.
 
-After the repository exists on GitHub:
+## Safety boundaries
 
-1. Push these files to the `main` branch.
-2. Open **Settings → Pages**.
-3. Under **Build and deployment**, select **GitHub Actions** if GitHub has not already selected it.
-4. The `Deploy Iron Brain to GitHub Pages` workflow publishes the site.
+- One direction, one setup, one entry, one stop, one target.
+- No TP2/TP3, runner, scale-in, backup entry, second-best trade, or alternative direction.
+- Screenshots are processed in memory and are not intentionally stored by ICT Brain.
+- No broker connectivity or order placement.
+- Confidence is deterministic visible-evidence quality, not win probability.
+- If candle reconstruction, setup evidence, OCR price grounding, or trade geometry is weak, the result is WAIT.
 
-For a repository named `iron-brain`, the expected public address is:
+## Deployment
 
-`https://<github-username>.github.io/iron-brain/`
-
-## Local preview
-
-```bash
-python -m http.server 4173
-```
-
-Then open `http://localhost:4173`.
-
-## Next milestone — UI v0.2
-
-Replace simulated frontend state with a read-only `BrainSnapshot` stream from the frozen V13.5.8 Python quant backend. The browser remains presentation-only and has no execution authority.
+The repository root is Vercel-ready. `main` is connected to the production project, so successful pushes can redeploy automatically.
