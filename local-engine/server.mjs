@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import analyzeHandler from '../vercel-app/api/analyze-v64.js';
+import analyzeHandler from '../vercel-app/api/analyze-v64-entry.js';
 import healthHandler from '../vercel-app/api/health.js';
 
 const HOST = '127.0.0.1';
