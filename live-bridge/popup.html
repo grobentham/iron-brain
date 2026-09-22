@@ -11,7 +11,7 @@
     <header>
       <div>
         <p class="eyebrow">ICT BRAIN</p>
-        <h1>Live Bridge <span class="mini">v1.2.1</span></h1>
+        <h1>Live Bridge <span class="mini">v1.3</span></h1>
       </div>
       <span id="monitorBadge" class="badge off">OFF</span>
     </header>
@@ -26,14 +26,10 @@
       </div>
       <div class="grid2">
         <label>Instrument
-          <select id="instrument">
-            <option>AUTO</option><option>NQ</option><option>MNQ</option><option>ES</option>
-          </select>
+          <select id="instrument"><option>AUTO</option><option>NQ</option><option>MNQ</option><option>ES</option></select>
         </label>
         <label>Timeframe
-          <select id="timeframe">
-            <option>AUTO</option><option>1m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1H</option><option>4H</option><option>1D</option>
-          </select>
+          <select id="timeframe"><option>AUTO</option><option>1m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1H</option><option>4H</option><option>1D</option></select>
         </label>
       </div>
       <button id="connectBtn" class="primary">Connect current TradingView tab</button>
@@ -52,39 +48,19 @@
 
     <section class="card">
       <div class="row between">
-        <div>
-          <p class="label">Live Scan</p>
-          <p class="hint">Only analyzes when a connected chart changes. Five-chart mode preserves the full MTF stack plus synchronized 1m SMT.</p>
-        </div>
-        <label class="switch">
-          <input id="monitorToggle" type="checkbox" />
-          <span></span>
-        </label>
+        <div><p class="label">Live Scan</p><p class="hint">The hosted ICT Brain backend analyzes only when a connected chart changes.</p></div>
+        <label class="switch"><input id="monitorToggle" type="checkbox" /><span></span></label>
       </div>
-      <div class="row between">
-        <span class="hint">Lifecycle</span>
-        <span id="lifecycleState" class="mini">WATCHING</span>
-      </div>
-      <div class="row between">
-        <span class="hint">Unchanged scans skipped</span>
-        <span id="unchangedSkips" class="mini">0</span>
-      </div>
+      <div class="row between"><span class="hint">Lifecycle</span><span id="lifecycleState" class="mini">WATCHING</span></div>
+      <div class="row between"><span class="hint">Unchanged scans skipped</span><span id="unchangedSkips" class="mini">0</span></div>
       <label>Scan interval
-        <select id="interval">
-          <option value="30">30 seconds</option>
-          <option value="60">1 minute</option>
-          <option value="120">2 minutes</option>
-          <option value="300">5 minutes</option>
-        </select>
+        <select id="interval"><option value="30">30 seconds</option><option value="60">1 minute</option><option value="120">2 minutes</option><option value="300">5 minutes</option></select>
       </label>
       <button id="scanBtn" class="secondary">Scan now</button>
     </section>
 
     <section class="card result-card">
-      <div class="row between">
-        <p class="label">Latest result</p>
-        <span id="scanTime" class="mini">Never</span>
-      </div>
+      <div class="row between"><p class="label">Latest result</p><span id="scanTime" class="mini">Never</span></div>
       <div id="result" class="result wait">No scan yet.</div>
       <p id="lifecycleDetail" class="hint"></p>
       <p id="timeStatus" class="hint"></p>
@@ -93,18 +69,15 @@
     </section>
 
     <details class="card settings">
-      <summary>Local engine settings</summary>
+      <summary>Private access</summary>
       <label>ICT Brain access key
-        <input id="accessKey" type="password" autocomplete="off" placeholder="Normally blank for the local engine" />
+        <input id="accessKey" type="password" autocomplete="off" placeholder="Leave blank unless private access is enabled" />
       </label>
-      <label>Backend URL
-        <input id="backendUrl" type="url" value="http://127.0.0.1:8787/analyze" />
-      </label>
-      <button id="saveSettingsBtn" class="secondary">Save settings</button>
+      <button id="saveSettingsBtn" class="secondary">Save access key</button>
     </details>
 
-    <p class="foot">Authorized TradingView tabs only. Local five-chart native monitoring. No broker orders. No external model API.</p>
+    <p class="foot">TradingView → Live Bridge → hosted ICT Brain web app. No broker orders. No external model API.</p>
   </main>
-  <script src="popup-v12.js"></script>
+  <script src="popup-v13.js"></script>
 </body>
 </html>
