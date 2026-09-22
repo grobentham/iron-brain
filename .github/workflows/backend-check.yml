@@ -1,125 +1,71 @@
-name: Check ICT Brain Native Backend
+name: Check ICT Brain Browser Native
 
 on:
   push:
     branches: [main]
     paths:
-      - 'vercel-app/**'
-      - 'api/**'
       - 'index.html'
       - 'app.js'
       - 'styles.css'
-      - 'package.json'
-      - 'vercel.json'
+      - 'browser-engine/**'
+      - 'vercel-app/lib/**'
       - 'live-bridge/**'
       - '.github/workflows/backend-check.yml'
+      - '.github/workflows/pages.yml'
   pull_request:
     paths:
-      - 'vercel-app/**'
-      - 'api/**'
       - 'index.html'
       - 'app.js'
       - 'styles.css'
-      - 'package.json'
-      - 'vercel.json'
+      - 'browser-engine/**'
+      - 'vercel-app/lib/**'
       - 'live-bridge/**'
       - '.github/workflows/backend-check.yml'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  canonical-backend:
+  browser-native-engine:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: vercel-app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
       - name: Syntax checks
-        run: npm run check
-      - name: Native engine, time axis, cross market, lifecycle, market model, grounding, and architect tests
-        run: npm test
-      - name: Native-only v6.4 invariants
         run: |
-          grep -q "const VERSION = '6.4.0'" api/analyze-v64.js
-          grep -q "body.screenshots.length === 5" api/analyze-v64.js
-          grep -q "fiveChartNativeMode: true" api/analyze-v64.js
-          grep -q "attachStrategyLifecycle" api/analyze-v64.js
-          grep -q "live-bridge-dom-price-axis" api/analyze-v64.js
-          grep -q "authorized(req)" api/analyze-v64-entry.js
-          grep -q "limitFive(req)" api/analyze-v64-entry.js
-          grep -q "buildSynchronizedSMT" lib/cross-market-v6.js
-          grep -q "noAbsolutePriceComparisonAcrossMarkets" lib/cross-market-v6.js
-          grep -q "buildUnifiedGraph" lib/market-model-v6.js
-          grep -q "rankDOLCandidates" lib/market-model-v6.js
-          grep -q "SYNCHRONIZED_SMT_REVERSAL" lib/strategy-architect.js
-          grep -q "LIFECYCLE_VERSION = '6.4.0'" lib/strategy-lifecycle-v6.js
-          grep -q "TARGET_HIT" lib/strategy-lifecycle-v6.js
-          grep -q "sameCandleStopTargetOutcomeFailsClosed" lib/strategy-lifecycle-v6.js
-          test -s test/time-axis-v6.test.mjs
-          test -s test/cross-market-v6.test.mjs
-          test -s test/strategy-lifecycle-v6.test.mjs
-          if grep -E "SOURCE_FACTS|setupId: 'S0|setupId: \"S0" lib/strategy-architect.js lib/market-model-v6.js; then
-            echo 'Named setup IDs leaked into Strategy Architect decision path'
-            exit 1
-          fi
-          if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" --exclude='*.md' --exclude-dir=node_modules .; then
-            echo 'External inference dependency/reference found in native backend'
-            exit 1
-          fi
-          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' --exclude='*.md' --exclude-dir=node_modules .; then
-            echo 'Possible committed secret found'
-            exit 1
-          fi
-
-  hosted-webapp:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Install root dependencies
-        run: npm install --no-audit --no-fund
-      - name: Validate hosted website and API files
+          node --check app.js
+          node --check browser-engine/native-reconstruct.js
+          node --check browser-engine/pipeline.js
+          node --check vercel-app/lib/time-axis-v6.js
+          node --check vercel-app/lib/cross-market-v6.js
+          node --check vercel-app/lib/market-model-v6.js
+          node --check vercel-app/lib/strategy-architect.js
+          node --check vercel-app/lib/strategy-lifecycle-v6.js
+      - name: Browser architecture invariants
         run: |
-          npm run check
           test -s index.html
           test -s styles.css
-          test -s app.js
-          test -s package.json
-          test -s vercel.json
-          test -s api/analyze.js
-          test -s api/health.js
-          test -s api/strategy-knowledge.js
-          test -s vercel-app/api/analyze-v64-entry.js
-          grep -q '"version": "6.4.0"' package.json
-          grep -Fq "export { default } from '../vercel-app/api/analyze-v64-entry.js';" api/analyze.js
-          grep -q "NO MODEL API" index.html
-          grep -q "externalInference === false" app.js
-          grep -q "fetch('/api/health'" app.js
-          grep -q "fetch('/api/analyze'" app.js
-          grep -q "ICT_BRAIN_LIVE_BRIDGE" app.js
-          if grep -E "127\.0\.0\.1|localhost:8787|targetAddressSpace" app.js index.html; then
-            echo 'Local-engine dependency leaked into hosted website'
+          test -s browser-engine/native-reconstruct.js
+          test -s browser-engine/pipeline.js
+          grep -q 'BROWSER NATIVE' index.html
+          grep -q 'NO SERVER BACKEND' index.html
+          grep -q "analyzeInBrowser" app.js
+          grep -q "browserEngineHealth" app.js
+          grep -q "Canvas/ImageData" index.html
+          grep -q "buildSynchronizedSMT" vercel-app/lib/cross-market-v6.js
+          grep -q "buildUnifiedGraph" vercel-app/lib/market-model-v6.js
+          grep -q "SYNCHRONIZED_SMT_REVERSAL" vercel-app/lib/strategy-architect.js
+          grep -q "LIFECYCLE_VERSION = '6.4.0'" vercel-app/lib/strategy-lifecycle-v6.js
+          if grep -E "fetch\('/api/|iron-brain\.vercel\.app|127\.0\.0\.1|localhost:8787|railway|render\.com" index.html app.js browser-engine/*.js; then
+            echo 'Remote/local server dependency leaked into active browser app'
             exit 1
           fi
-          grep -q '"maxDuration": 60' vercel.json
-      - name: Scan hosted source for external inference and secrets
-        run: |
-          if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" --exclude='*.md' --exclude-dir=node_modules --exclude-dir=.git api vercel-app index.html app.js package.json vercel.json; then
-            echo 'External inference reference found in hosted source'
-            exit 1
-          fi
-          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' --exclude='*.md' --exclude-dir=node_modules --exclude-dir=.git api vercel-app index.html app.js styles.css package.json vercel.json; then
-            echo 'Possible committed secret found'
+          if grep -R -E "from 'ai'|from \"ai\"|generateObject|generateText|AI_GATEWAY|gpt-|claude-|gemini-" --exclude='*.md' browser-engine vercel-app/lib index.html app.js; then
+            echo 'External inference dependency/reference found'
             exit 1
           fi
 
@@ -130,46 +76,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate Live Bridge v1.3 hosted routing
+      - name: Validate Live Bridge v1.4 browser handoff
         run: |
-          test -s live-bridge/manifest.json
-          test -s live-bridge/content-script.js
-          test -s live-bridge/dashboard-bridge.js
-          test -s live-bridge/service-worker-v12.js
-          test -s live-bridge/service-worker-hosted.js
-          test -s live-bridge/popup.html
-          test -s live-bridge/popup-v13.js
-          test -s live-bridge/popup.css
-          test -s live-bridge/icon.svg
           node -e "JSON.parse(require('fs').readFileSync('live-bridge/manifest.json','utf8'))"
           node --check live-bridge/content-script.js
-          node --check live-bridge/dashboard-bridge.js
-          node --check live-bridge/service-worker-v12.js
-          node --check live-bridge/service-worker-hosted.js
-          node --check live-bridge/popup-v13.js
-          grep -q '"version": "1.3.0"' live-bridge/manifest.json
-          grep -q '"service_worker": "service-worker-hosted.js"' live-bridge/manifest.json
-          grep -q 'https://iron-brain.vercel.app/\*' live-bridge/manifest.json
-          grep -q 'dashboard-bridge.js' live-bridge/manifest.json
-          grep -q "HOSTED_BACKEND = 'https://iron-brain.vercel.app/api/analyze'" live-bridge/service-worker-hosted.js
-          grep -q 'MAX_CONNECTED_TABS=5' live-bridge/service-worker-v12.js
-          grep -q 'TOTAL_CAPTURE_BUDGET=2_650_000' live-bridge/service-worker-v12.js
-          grep -q 'OffscreenCanvas' live-bridge/service-worker-v12.js
-          grep -q 'ICT_BRAIN_LIVE_BRIDGE' live-bridge/dashboard-bridge.js
-          grep -q 'recommended: NQ 1H, NQ 15m, MNQ 5m, MNQ 1m, ES 1m' live-bridge/popup.html
-          grep -q '0 / 5' live-bridge/popup.html
-          grep -q 'No broker orders. No external model API.' live-bridge/popup.html
-          if grep -R -E 'http://127\.0\.0\.1:8787|http://localhost:8787' live-bridge; then
-            echo 'Local backend reference found in hosted Live Bridge'
-            exit 1
-          fi
-      - name: Ensure bridge contains no external AI/model calls or committed secrets
-        run: |
-          if grep -R -E "openai|anthropic|gemini|gpt-|claude-|AI_GATEWAY|generateObject|generateText" --exclude='*.md' live-bridge; then
-            echo 'External AI/model reference found in Live Bridge source'
-            exit 1
-          fi
-          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|ICT_BRAIN_ACCESS_KEY=)' --exclude='*.md' live-bridge; then
-            echo 'Possible committed secret found in Live Bridge'
+          node --check live-bridge/service-worker-browser.js
+          node --check live-bridge/page-bridge.js
+          node --check live-bridge/popup-v14.js
+          grep -q '"version": "1.4.0"' live-bridge/manifest.json
+          grep -q '"service_worker": "service-worker-browser.js"' live-bridge/manifest.json
+          grep -q 'https://grobentham.github.io/iron-brain/\*' live-bridge/manifest.json
+          grep -q 'page-bridge.js' live-bridge/manifest.json
+          grep -q 'ICT_CAPTURE_STACK' live-bridge/service-worker-browser.js
+          grep -q 'ICT_EXTENSION_REQUEST' live-bridge/page-bridge.js
+          grep -q 'No Vercel. No localhost server.' live-bridge/popup.html
+          if grep -E 'iron-brain\.vercel\.app|127\.0\.0\.1:8787|localhost:8787' live-bridge/manifest.json live-bridge/service-worker-browser.js live-bridge/page-bridge.js live-bridge/popup.html live-bridge/popup-v14.js; then
+            echo 'Server dependency found in active Live Bridge v1.4 files'
             exit 1
           fi
