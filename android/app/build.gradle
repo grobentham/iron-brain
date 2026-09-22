@@ -1,0 +1,35 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.ictbrain.analyzer'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.ictbrain.analyzer'
+        minSdk 26
+        targetSdk 36
+        versionCode 20000
+        versionName '2.0.0'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation 'com.google.mlkit:genai-prompt:1.0.0-beta4'
+    // beta4 can resolve an older coroutine runtime transitively on some graphs; pin the compatible runtime.
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+}
