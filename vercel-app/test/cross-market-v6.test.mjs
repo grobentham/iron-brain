@@ -5,7 +5,7 @@ import { buildSynchronizedSMT } from '../lib/cross-market-v6.js';
 function candles({ leader = false } = {}) {
   const out=[];
   for(let i=0;i<24;i++){
-    const base=100+i*0.02;
+    const base=100;
     const late=i>=20;
     const high=base+1+(leader&&late?1.2:0);
     const low=base-1;
