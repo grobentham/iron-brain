@@ -3,13 +3,14 @@ import { createRequire } from 'node:module';
 import sharp from 'sharp';
 import { createWorker } from 'tesseract.js';
 import { analyzeNativeShots, supportedNativeSetups } from '../lib/native-engine.js';
+import { architectStrategy, strategyKnowledgeSummary } from '../lib/strategy-architect.js';
 import { calibratePriceAxis, parseHocrPriceSamples, priceForPermille, rr, validateGeometry } from '../lib/grounding.js';
 
 export const config = { maxDuration: 60 };
 
 const require = createRequire(import.meta.url);
 const ENG_DATA = require('@tesseract.js-data/eng');
-const BACKEND_VERSION = '4.2.0';
+const BACKEND_VERSION = '5.0.0';
 const MAX_IMAGES = 4;
 const MAX_TOTAL_BYTES = 2_900_000;
 const MAX_IMAGE_BYTES = 1_250_000;
@@ -253,21 +254,23 @@ function waitResult(reason, native, shots, calibrations = []) {
   const evidence = [];
   if (analysis?.diagnostics) evidence.push(`Execution screenshot reconstruction: ${analysis.diagnostics.detectedCandles} candles · visual Q${analysis.diagnostics.visualQuality}.`);
   if (native?.contextBias) evidence.push(`Deterministic multi-timeframe bias: ${native.contextBias}.`);
+  if (native?.architect?.created === false && native?.architect?.reason) evidence.push(`Strategy Architect: ${native.architect.reason}`);
   const calibration = idx !== null ? calibrations[idx] : null;
   if (calibration && !calibration.strong && Array.isArray(calibration.attempts)) {
     const counts = calibration.attempts.map((x, i) => `pass ${i + 1}: ${x.labels} labels`).join(' · ');
     if (counts) evidence.push(`Local price-axis OCR diagnostics: ${counts}.`);
   }
   return {
-    decision: 'WAIT', setupId: 'NONE', setup: 'No validated fixed trade', instrument: shot?.instrument || 'UNKNOWN', bias: native?.contextBias || 'UNCLEAR', dol: 'UNCLEAR', dolPrice: null,
+    decision: 'WAIT', setupId: 'NONE', setup: 'No validated architected trade', instrument: shot?.instrument || 'UNKNOWN', bias: native?.contextBias || 'UNCLEAR', dol: 'UNCLEAR', dolPrice: null,
     sessionContext: '', confidence: analysis?.quality || 0, trigger: '', invalidation: '', evidence, uncertainty: [reason].filter(Boolean), reason,
     entry: null, stop: null, target: null, rr: null, executionChart: idx === null ? null : idx + 1,
     executionLabel: shot ? `Screenshot ${idx + 1} · ${shot.instrument} · ${shot.timeframe}` : null, pricing: calibrations.map(publicCalibration),
+    strategyArchitect: native?.architect || null,
   };
 }
 
 function validateNativePlan(native, shots, calibrations) {
-  if (native.decision === 'WAIT' || !native.best) return waitResult(native.reason || 'No native setup passed.', native, shots, calibrations);
+  if (native.decision === 'WAIT' || !native.best) return waitResult(native.reason || 'Strategy Architect did not create a valid trade.', native, shots, calibrations);
   const best = native.best, idx = native.executionIndex, shot = shots[idx], calibration = calibrations[idx];
   if (!calibration?.strong) {
     const detail = calibration?.reason ? ` (${calibration.reason})` : '';
@@ -278,16 +281,39 @@ function validateNativePlan(native, shots, calibrations) {
   const target = priceForPermille(calibration, best.targetY);
   if (!validateGeometry(best.direction, entry, stop, target)) return waitResult('Locally grounded prices failed trade geometry validation.', native, shots, calibrations);
   const ratio = rr(best.direction, entry, stop, target);
-  if (!Number.isFinite(ratio) || ratio < 1 || ratio > 20) return waitResult('The deterministic plan failed local risk/reward validation.', native, shots, calibrations);
+  if (!Number.isFinite(ratio) || ratio < 1 || ratio > 20) return waitResult('The architected plan failed local risk/reward validation.', native, shots, calibrations);
   const confidence = Math.min(100, Math.round(best.score * 0.82 + calibration.quality * 0.18));
   const evidence = best.evidence.map(x => `Screenshot ${idx + 1} · ${x}`);
   evidence.push(`Local price grounding: ${calibration.samples.length} labels · Q${calibration.quality} · ${calibration.method}.`);
   if (native.contextBias) evidence.push(`Multi-timeframe reconstructed bias: ${native.contextBias}.`);
   return {
-    decision: best.direction, setupId: best.setupId, setup: best.setup, instrument: shot.instrument, bias: native.contextBias || (best.direction === 'LONG' ? 'BULLISH' : 'BEARISH'),
-    dol: best.dol, dolPrice: target, sessionContext: 'No session-time assumption was used by the native engine.', confidence, trigger: best.trigger, invalidation: best.invalidation, evidence,
-    uncertainty: ['Candles are reconstructed from screenshot pixels rather than broker OHLC data.', 'Time-window setups S03/S04/S10 and cross-market SMT S02 remain fail-closed until native time/alignment extraction is certified.'],
-    reason: '', entry, stop, target, rr: Number(ratio.toFixed(2)), executionChart: idx + 1, executionLabel: `Screenshot ${idx + 1} · ${shot.instrument} · ${shot.timeframe}`, pricing: calibrations.map(publicCalibration),
+    decision: best.direction,
+    setupId: best.setupId,
+    setup: best.setup,
+    instrument: shot.instrument,
+    bias: native.contextBias || (best.direction === 'LONG' ? 'BULLISH' : 'BEARISH'),
+    dol: best.dol,
+    dolPrice: target,
+    sessionContext: 'The Strategy Architect used only reconstructed screenshot evidence; no unseen session-time assumption was invented.',
+    confidence,
+    trigger: best.trigger,
+    invalidation: best.invalidation,
+    evidence,
+    uncertainty: [
+      'Candles are reconstructed from screenshot pixels rather than broker OHLC data.',
+      'The Strategy Architect only knows market facts that the perception layer can prove from supplied screenshots.',
+      'Time-window logic and cross-market SMT remain fail-closed until native timestamp/alignment extraction is certified.',
+    ],
+    reason: '',
+    entry,
+    stop,
+    target,
+    rr: Number(ratio.toFixed(2)),
+    executionChart: idx + 1,
+    executionLabel: `Screenshot ${idx + 1} · ${shot.instrument} · ${shot.timeframe}`,
+    pricing: calibrations.map(publicCalibration),
+    strategyArchitect: native?.architect || null,
+    sourceDetector: best.sourceSetupId || null,
   };
 }
 
@@ -366,17 +392,21 @@ export default async function handler(req, res) {
         requestId,
         cacheHit: true,
         processingMs: Date.now() - started,
-        stages: { normalizeMs, nativeVisionMs: 0, groundingMs: 0 },
+        stages: { normalizeMs, nativeVisionMs: 0, architectMs: 0, groundingMs: 0 },
       };
       return json(res, 200, cached, requestId);
     }
 
     const visionStarted = Date.now();
-    const native = await analyzeNativeShots(shots);
+    const perceived = await analyzeNativeShots(shots);
     const nativeVisionMs = Date.now() - visionStarted;
+
+    const architectStarted = Date.now();
+    const native = architectStrategy(perceived, shots);
+    const architectMs = Date.now() - architectStarted;
+
     const calibrations = Array(shots.length).fill(null);
     let groundingMs = 0;
-
     if (native.decision !== 'WAIT' && Number.isInteger(native.executionIndex)) {
       const groundingStarted = Date.now();
       calibrations[native.executionIndex] = await calibrateScreenshot(shots[native.executionIndex]);
@@ -384,31 +414,36 @@ export default async function handler(req, res) {
     }
 
     const result = validateNativePlan(native, shots, calibrations);
+    const knowledge = strategyKnowledgeSummary();
     const payload = {
       ok: true,
       result,
       meta: {
         requestId,
         backendVersion: BACKEND_VERSION,
-        engine: 'native-deterministic-v4.2',
+        engine: 'native-deterministic-v4.2+strategy-architect-v5',
+        strategyCreator: 'deterministic-strategy-architect-v5',
+        strategyKnowledgeVersion: knowledge.version,
         externalInference: false,
         aiGateway: false,
         externalModelApi: false,
         screenshots: shots.length,
-        supportedNativeSetups: supportedNativeSetups(),
+        sourceDetectors: supportedNativeSetups(),
         processingMs: Date.now() - started,
-        stages: { normalizeMs, nativeVisionMs, groundingMs },
+        stages: { normalizeMs, nativeVisionMs, architectMs, groundingMs },
         cacheHit: false,
         serverGrounding: true,
         groundingMode: 'local-tesseract-hires-adaptive-three-pass + deterministic-pixel-candle-engine',
         ocrLanguageData: 'bundled-npm-package',
+        strategyCreated: Boolean(native?.architect?.created),
+        strategyId: native?.architect?.strategyId || null,
         imagesStored: false,
       },
     };
     setCached(fingerprint, payload);
     console.info(JSON.stringify({
-      event: 'ictbrain.native-analysis', requestId, decision: result.decision, setup: result.setupId,
-      screenshots: shots.length, normalizeMs, nativeVisionMs, groundingMs, totalMs: Date.now() - started,
+      event: 'ictbrain.strategy-architect-analysis', requestId, decision: result.decision, strategy: result.setupId,
+      sourceDetector: result.sourceDetector || null, screenshots: shots.length, normalizeMs, nativeVisionMs, architectMs, groundingMs, totalMs: Date.now() - started,
     }));
     return json(res, 200, payload, requestId);
   } catch (error) {
