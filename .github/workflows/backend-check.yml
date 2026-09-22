@@ -36,15 +36,20 @@ jobs:
         run: npm test
       - name: Native-only invariants
         run: |
-          grep -q "BACKEND_VERSION = '4.1.0'" api/analyze.js
+          grep -q "BACKEND_VERSION = '4.2.0'" api/analyze.js
           grep -q "externalInference: false" api/analyze.js
-          grep -q "native-deterministic-v4.1" api/analyze.js
+          grep -q "native-deterministic-v4.2" api/analyze.js
           grep -q "analyzeNativeShots" api/analyze.js
           grep -q "@tesseract.js-data/eng" package.json
           grep -q "langPath: ENG_DATA.langPath" api/analyze.js
           grep -q "tessedit_char_whitelist" api/analyze.js
-          grep -q "leftFraction: 0.80" api/analyze.js
-          grep -q "leftFraction: 0.84" api/analyze.js
+          grep -q "ocrBuffer" api/analyze.js
+          grep -q "leftFraction: 0.82" api/analyze.js
+          grep -q "leftFraction: 0.78" api/analyze.js
+          grep -q "leftFraction: 0.86" api/analyze.js
+          grep -q "psm: 11" api/analyze.js
+          grep -q "psm: 6" api/analyze.js
+          grep -q "psm: 4" api/analyze.js
           grep -q "PRICE_FIND_RE" lib/grounding.js
           grep -q "supportedNativeSetups" lib/native-engine.js
           grep -q "S01" lib/native-engine.js
@@ -81,10 +86,13 @@ jobs:
           test -s vercel-app/api/analyze.js
           test -s vercel-app/lib/grounding.js
           test -s vercel-app/lib/native-engine.js
-          grep -q '"version": "4.1.0"' package.json
+          grep -q '"version": "4.2.0"' package.json
           grep -q "NO MODEL API" index.html
           grep -q "Run native analysis" index.html
           grep -q "externalInference === false" app.js
+          grep -q "startsWith('native-deterministic-v4')" app.js
+          grep -q "MAX_SIDE = 1800" app.js
+          grep -q "MAX_SINGLE_IMAGE_BYTES = 1_200_000" app.js
           grep -Fq "export const config = { maxDuration: 60 };" api/analyze.js
           grep -Fq "export { default } from '../vercel-app/api/analyze.js';" api/analyze.js
           grep -Fq "export { default } from '../vercel-app/api/health.js';" api/health.js
