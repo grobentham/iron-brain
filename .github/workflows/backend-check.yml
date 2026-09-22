@@ -74,7 +74,9 @@ jobs:
           test -s api/health.js
           test -s vercel-app/api/analyze.js
           test -s vercel-app/lib/grounding.js
-          grep -Fq "export { config, default } from '../vercel-app/api/analyze.js';" api/analyze.js
+          grep -Fq "export const config = { maxDuration: 120 };" api/analyze.js
+          grep -Fq "export { default } from '../vercel-app/api/analyze.js';" api/analyze.js
+          grep -q '"maxDuration": 120' vercel.json
           grep -Fq "export { default } from '../vercel-app/api/health.js';" api/health.js
           grep -q '"version": "3.1.0"' package.json
           grep -q "Find one grounded trade" index.html
