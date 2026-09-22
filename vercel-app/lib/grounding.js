@@ -3,9 +3,9 @@ const PRICE_FIND_RE = /(?:\d{1,3}(?:,\d{3})+|\d{4,6})(?:[.,]\d{1,2})?/g;
 const MIN_PRICE = 1000;
 const MAX_PRICE = 100000;
 const TICK_SIZE = 0.25;
-const MAX_RESIDUAL = 1.5;
+const MAX_RESIDUAL = 2.0;
 const MIN_Y_SPAN = 0.12;
-const MIN_R2 = 0.985;
+const MIN_R2 = 0.982;
 const MIN_QUALITY = 68;
 const EXTRAPOLATION_MARGIN = 0.055;
 
@@ -58,7 +58,7 @@ function parseWords(hocr = '') {
     if (!bbox) continue;
     const confidence = attrs.match(/x_wconf\s+(\d+)/i);
     const conf = confidence ? Number(confidence[1]) : 50;
-    if (conf < 22) continue;
+    if (conf < 12) continue;
     const x0 = Number(bbox[1]), y0 = Number(bbox[2]), x1 = Number(bbox[3]), y1 = Number(bbox[4]);
     if (![x0, y0, x1, y1].every(Number.isFinite) || x1 <= x0 || y1 <= y0) continue;
     const text = normalizeOcrToken(match[2]);
@@ -85,7 +85,7 @@ export function parseHocrPriceSamples(hocr = '', imageHeight = 1) {
     if (direct) out.push(direct);
   }
 
-  const tolerance = Math.max(4, imageHeight * 0.008);
+  const tolerance = Math.max(5, imageHeight * 0.011);
   const rows = [];
   for (const word of [...words].sort((a, b) => a.cy - b.cy || a.x0 - b.x0)) {
     let row = rows.find(r => Math.abs(r.cy - word.cy) <= tolerance);
@@ -114,7 +114,7 @@ export function dedupeSamples(samples) {
   const sorted = [...samples].sort((a, b) => a.y - b.y || a.price - b.price);
   const out = [];
   for (const sample of sorted) {
-    const dup = out.some(x => Math.abs(x.y - sample.y) < 0.004 && Math.abs(x.price - sample.price) < 0.26);
+    const dup = out.some(x => Math.abs(x.y - sample.y) < 0.006 && Math.abs(x.price - sample.price) < 0.26);
     if (!dup) out.push(sample);
   }
   return out;
