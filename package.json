@@ -1,16 +1,15 @@
 {
-  "name": "ict-brain-backend-web",
-  "version": "3.1.0",
+  "name": "ict-brain-native-web",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check api/analyze.js && node --check api/health.js && node --check app.js"
+    "check": "node --check api/analyze.js && node --check api/health.js && node --check app.js && node --check vercel-app/api/analyze.js && node --check vercel-app/lib/native-engine.js"
   },
   "dependencies": {
-    "ai": "^6.0.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "sharp": "^0.34.0",
-    "tesseract.js": "^6.0.0",
-    "zod": "^4.0.0"
+    "tesseract.js": "^6.0.0"
   }
 }
