@@ -53,9 +53,7 @@ jobs:
           emulator-boot-timeout: 300
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
           script: |
-            set -e
-            APK=android/app/build/outputs/apk/debug/app-debug.apk
-            adb install -r "$APK"
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             adb logcat -c
             adb shell am start -W -n com.ictbrain.analyzer/.MainActivity | tee /tmp/start.txt
             sleep 6
@@ -67,10 +65,7 @@ jobs:
             grep -q "Find one grounded trade" /tmp/window.xml
             adb shell dumpsys activity activities | grep -q "com.ictbrain.analyzer/.MainActivity"
             adb logcat -d > /tmp/logcat.txt
-            if grep -E "FATAL EXCEPTION:.*|Process: com\.ictbrain\.analyzer" /tmp/logcat.txt; then
-              echo "Fatal crash detected"
-              exit 1
-            fi
+            ! grep -E "FATAL EXCEPTION:.*|Process: com\.ictbrain\.analyzer" /tmp/logcat.txt
             echo "Runtime smoke test passed: app installed, launched, rendered expected UI, and had no fatal crash."
 
       - name: Upload smoke diagnostics
