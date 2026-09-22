@@ -11,6 +11,18 @@ on:
       - 'styles.css'
       - 'package.json'
       - 'vercel.json'
+      - 'live-bridge/**'
+      - '.github/workflows/backend-check.yml'
+  pull_request:
+    paths:
+      - 'vercel-app/**'
+      - 'api/**'
+      - 'index.html'
+      - 'app.js'
+      - 'styles.css'
+      - 'package.json'
+      - 'vercel.json'
+      - 'live-bridge/**'
       - '.github/workflows/backend-check.yml'
   workflow_dispatch:
 
@@ -118,5 +130,46 @@ jobs:
             --exclude='*.md' --exclude-dir=node_modules --exclude-dir=.git \
             api vercel-app index.html app.js styles.css package.json vercel.json; then
             echo 'Possible committed secret found'
+            exit 1
+          fi
+
+  live-bridge-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate extension files and JavaScript
+        run: |
+          test -s live-bridge/manifest.json
+          test -s live-bridge/content-script.js
+          test -s live-bridge/service-worker.js
+          test -s live-bridge/popup.html
+          test -s live-bridge/popup.css
+          test -s live-bridge/popup.js
+          test -s live-bridge/icon.svg
+          node -e "JSON.parse(require('fs').readFileSync('live-bridge/manifest.json','utf8'))"
+          node --check live-bridge/content-script.js
+          node --check live-bridge/service-worker.js
+          node --check live-bridge/popup.js
+          grep -q '"manifest_version": 3' live-bridge/manifest.json
+          grep -q 'https://www.tradingview.com/\*' live-bridge/manifest.json
+          grep -q 'https://iron-brain.vercel.app/\*' live-bridge/manifest.json
+          grep -q 'MAX_CONNECTED_TABS = 4' live-bridge/service-worker.js
+          grep -q 'MIN_INTERVAL_SEC = 30' live-bridge/service-worker.js
+          grep -q 'ICT_CAPTURE_CHART' live-bridge/content-script.js
+          grep -q 'dom-canvas-composite' live-bridge/content-script.js
+          grep -q 'No broker orders. No external model API.' live-bridge/popup.html
+      - name: Ensure bridge contains no external AI/model calls or committed secrets
+        run: |
+          if grep -R -E "openai|anthropic|gemini|gpt-|claude-|AI_GATEWAY|generateObject|generateText" \
+            --exclude='*.md' live-bridge; then
+            echo 'External AI/model reference found in Live Bridge source'
+            exit 1
+          fi
+          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|ICT_BRAIN_ACCESS_KEY=)' \
+            --exclude='*.md' live-bridge; then
+            echo 'Possible committed secret found in Live Bridge'
             exit 1
           fi
