@@ -1,0 +1,42 @@
+name: Check ICT Brain Backend
+
+on:
+  push:
+    branches: [backend-v1, main]
+    paths:
+      - 'vercel-app/**'
+      - '.github/workflows/backend-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vercel-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Syntax checks
+        run: npm run check
+      - name: Grounding tests
+        run: npm test
+      - name: Safety invariants
+        run: |
+          grep -q "MAX_IMAGES = 4" api/analyze.js
+          grep -q "MIN_ACTIONABLE_CONFIDENCE = 60" api/analyze.js
+          grep -q "DO NOT output numeric prices" api/analyze.js
+          grep -q "priceForPermille" api/analyze.js
+          grep -q "OCR-grounded prices failed local trade geometry validation" api/analyze.js
+          grep -q "disallowPromptTraining: true" api/analyze.js
+          if grep -R -E '(sk-[A-Za-z0-9]|AIza[0-9A-Za-z_-]{20,}|AI_GATEWAY_API_KEY=|ICT_BRAIN_ACCESS_KEY=)' --exclude='*.md' .; then
+            echo 'Possible committed secret found'
+            exit 1
+          fi
