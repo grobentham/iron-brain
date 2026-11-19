@@ -88,7 +88,22 @@ def test_random_walk_passes_nothing():
         assert x["live"]["state"] in ("waiting", "none", "signal", "no data"), x["live"]
 
 
+def test_alerts_only_for_new_signals():
+    import alerts
+    cand = {"market": "nq", "id": "trend-200", "tier": "candidate", "live": {"state": "signal", "dir": "LONG", "asOf": "2026-11-20"}}
+    paper = {"market": "nq", "id": "dip", "tier": "paper", "live": {"state": "signal", "dir": "LONG"}}
+    new = {"lab": {"strategies": [cand, paper]}}
+    assert [x["id"] for x in alerts.changes({"lab": {"strategies": []}}, new)] == ["trend-200"], "paper never alerts"
+    assert alerts.changes(new, new) == [], "an unchanged signal does not alert twice"
+    flat = {"lab": {"strategies": [dict(cand, live={"state": "none", "dir": "FLAT"})]}}
+    assert len(alerts.changes(flat, new)) == 1
+    title, body = alerts.text(cand | {"name": "200-day trend filter", "rule": "r", "t": 3.2, "beatRandom": 0.98,
+                                      "dsr": 0.91, "forward": {"since": "2026-11-19", "trades": 0}})
+    assert "Candidate" in title and "not advice" in body
+
+
 if __name__ == "__main__":
+    test_alerts_only_for_new_signals()
     test_fills_are_conservative()
     test_no_look_ahead()
     test_daily_rules_use_only_past_closes()

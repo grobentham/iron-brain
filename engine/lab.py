@@ -18,6 +18,9 @@ A strategy passes only if all hold:
   deflated Sharpe ratio (Bailey and Lopez de Prado) >= 0.95, counting every test as a trial
   enough data: 100 trades intraday; 30 separate positions and 250 days in the market for daily rules
 Everything after REGISTERED is a forward record: trades the rules could not have been tuned on.
+
+Tiers: "tested" passed everything and is a signal; "candidate" missed only the deflated Sharpe and is shown as a
+provisional signal; "paper" is everything else, shown for the record only.
 """
 import datetime as dt
 import math
@@ -32,6 +35,8 @@ REGISTERED = "2026-11-19"
 COST = {"nq": 0.75, "gold": 0.3}
 N_RANDOM = 200
 MIN_TRADES = 100
+# a candidate passed every check except these; it is shown as a provisional signal, never as a tested one
+CANDIDATE_MAY_MISS = {"dsr"}
 ND = NormalDist()
 
 
@@ -419,10 +424,36 @@ def _decision_slot(st):
             "late-momentum": slot(15), "fast-trend": slot(12)}[st["id"]]
 
 
-def live_daily(p, dates):
+def _last_weekday(y, m):
+    d = dt.date(y + (m == 12), m % 12 + 1, 1) - dt.timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= dt.timedelta(days=1)
+    return d
+
+
+def live_daily(st, p, dates, c):
+    """Position for the next session, plus what would change it."""
     pos = int(p[-1])
-    return {"state": "signal" if pos else "none", "dir": "LONG" if pos > 0 else "SHORT" if pos < 0 else "FLAT",
-            "note": "Position from the %s close to the next close." % dates[-1]}
+    last = dt.date.fromisoformat(dates[-1])
+    out = {"state": "signal" if pos else "none", "dir": "LONG" if pos > 0 else "SHORT" if pos < 0 else "FLAT",
+           "asOf": dates[-1], "note": "Position from the %s close to the next close." % dates[-1]}
+    if st["id"] == "trend-200" and len(c) >= 200:
+        avg = float(c[-200:].mean())
+        out["level"] = round(avg, 2)
+        out["next"] = ("Stays long while closes hold above the 200-day average (%.2f)." if pos else
+                       "Goes long after a close above the 200-day average (%.2f).") % avg
+    elif st["id"] == "turn-of-month":
+        if pos:
+            out["next"] = "Long through the close of the month's third trading day."
+        else:
+            d = _last_weekday(last.year, last.month)
+            if d <= last:
+                d = _last_weekday(last.year + (last.month == 12), last.month % 12 + 1)
+            out["next"] = "Next entry at the close on %s (last trading day of the month; check holidays)." % d.isoformat()
+            out["nextDate"] = d.isoformat()
+    elif st["id"] == "momentum-20" and len(c) > 20:
+        out["next"] = "Flips when the close crosses %.2f, the close 20 sessions ago." % float(c[-20])
+    return out
 
 
 # ---------- run ----------
@@ -518,18 +549,22 @@ def run(intraday_data, daily_data, now, log=print, seed=7):
                 p, r, trades = run_daily(st, dates, c, cost)
                 rr = [random_daily(p, c, cost, rnd) for _ in range(N_RANDOM)]
                 tests.append({"m": m, "st": st, "r": r, "trades": trades, "rnd": rr, "dates": dates, "pv": pv,
-                              "live": live_daily(p, dates)})
+                              "live": live_daily(st, p, dates, c), "last": float(c[-1]),
+                              "range": float(np.mean(np.abs(np.diff(np.log(c[-21:]))))) * float(c[-1])})
     n_trials = len(STRATEGIES) * len(D.MARKETS)
     bar = ND.inv_cdf(1 - 0.05 / n_trials)
     out = []
     for t in tests:
         ev = evaluate(t["r"], t["trades"], t["st"]["kind"], t["rnd"], n_trials, bar)
         sm = summary(t["trades"], t["pv"], rnd, t["dates"])
-        out.append({"id": t["st"]["id"], "name": t["st"]["name"], "kind": t["st"]["kind"], "rule": t["st"]["rule"],
+        miss = {k for k, v in ev["checks"].items() if not v}
+        tier = "tested" if not miss else "candidate" if miss <= CANDIDATE_MAY_MISS else "paper"
+        out.append({"tier": tier, "lastClose": t.get("last"), "avgDailyMove": t.get("range"), "id": t["st"]["id"], "name": t["st"]["name"], "kind": t["st"]["kind"], "rule": t["st"]["rule"],
                     "market": t["m"], **ev, **sm, "live": t["live"],
                     "recentTrades": [{k: (round(v, 2) if isinstance(v, float) else v) for k, v in x.items()
                                       if k in ("date", "dir", "entry", "exit", "why", "net")} for x in t["trades"][-8:]]})
     passed = [f"{x['market']}:{x['id']}" for x in out if x["passed"]]
-    log(f"lab: {len(out)} tests, bar t >= {bar:.2f}; passed {passed or 'none'}")
+    cands = [f"{x['market']}:{x['id']}" for x in out if x["tier"] == "candidate"]
+    log(f"lab: {len(out)} tests, bar t >= {bar:.2f}; passed {passed or 'none'}; candidates {cands or 'none'}")
     return {"registered": REGISTERED, "trials": n_trials, "bar": round(bar, 2), "random": N_RANDOM,
             "costs": COST, "strategies": out}
