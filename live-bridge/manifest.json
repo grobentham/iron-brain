@@ -1,35 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "ICT Brain Live Bridge",
-  "version": "1.5.0",
-  "description": "TradingView bridge for the browser-native ICT Brain website with live symbol/timeframe detection and automatic browser analysis.",
-  "permissions": [
-    "storage",
-    "tabs",
-    "scripting"
-  ],
-  "host_permissions": [
-    "https://www.tradingview.com/*",
-    "https://grobentham.github.io/iron-brain/*"
-  ],
-  "background": {
-    "service_worker": "service-worker-browser.js",
-    "type": "module"
-  },
-  "action": {
-    "default_title": "ICT Brain Live Bridge",
-    "default_popup": "popup.html"
-  },
+  "name": "Iron Brain Live Bridge",
+  "version": "2.0.0",
+  "description": "Reads the symbol and last price from your TradingView tab titles and passes them to the Iron Brain intraday desk.",
+  "permissions": ["tabs"],
+  "host_permissions": ["https://www.tradingview.com/*"],
+  "background": { "service_worker": "service-worker.js" },
   "content_scripts": [
-    {
-      "matches": ["https://www.tradingview.com/*"],
-      "js": ["content-script.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://grobentham.github.io/iron-brain/*"],
-      "js": ["page-bridge.js"],
-      "run_at": "document_idle"
-    }
-  ]
+    { "matches": ["https://grobentham.github.io/iron-brain/*", "http://localhost/*"], "js": ["page-bridge.js"], "run_at": "document_idle" }
+  ],
+  "icons": { "128": "icon.png" }
 }

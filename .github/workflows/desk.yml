@@ -1,0 +1,59 @@
+name: Iron Brain desk
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # every 15 minutes while futures trade (Sunday evening to Friday evening, UTC)
+    - cron: "*/15 * * * 0-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: desk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet "numpy>=2,<3"
+      - name: Engine tests
+        run: python engine/test_desk.py
+      - name: Page and extension syntax
+        run: |
+          node --check site/app.js
+          node --check live-bridge/service-worker.js
+          node --check live-bridge/page-bridge.js
+          node -e "JSON.parse(require('fs').readFileSync('live-bridge/manifest.json','utf8'))"
+
+  publish:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet "numpy>=2,<3"
+      - name: Run the desk engine
+        run: python engine/desk.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

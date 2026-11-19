@@ -1,36 +1,46 @@
-# ICT Brain v4 — Native Analysis Engine
+# Iron Brain
 
-ICT Brain v4 is a server-side screenshot analysis tool for NQ/MNQ/ES futures.
+The intraday desk for [Displace](https://grobentham.github.io/displace/): walk-forward tested session statistics for
+NQ and gold futures, live at **https://grobentham.github.io/iron-brain/**.
 
-## Core architecture
+From the current price and New York time the page shows:
 
-The production analysis path is self-contained software. It does **not** call ChatGPT, OpenAI, Gemini, Claude, Vercel AI Gateway, or another external inference API.
+- the chance of trading each level before the 17:00 close (steps of ¼ to 1 of the expected remaining range, plus any
+  level you type, such as a stop or target),
+- the chance the day still makes a new high or a new low,
+- how much of a typical day's movement is done and how fast today is running,
+- Displace's daily bias and range forecast for context.
 
-Pipeline:
+## How it works
 
-1. Browser compresses and uploads 1–4 screenshots.
-2. `sharp` normalizes the images in the Vercel function.
-3. The native pixel engine reconstructs a candlestick series from chart geometry.
-4. Deterministic structure code derives swings, liquidity raids, displacement, structural shifts, FVGs, breaker retests, rejection signals and multi-timeframe bias.
-5. Local Tesseract OCR reads the execution chart's right-side price scale. English trained data is bundled through `@tesseract.js-data/eng`, so the backend does not depend on a runtime language-data CDN.
-6. Local grounding converts screenshot Y positions into actual prices and validates entry/stop/target geometry and R:R.
-7. The backend returns exactly one LONG, SHORT, or WAIT result.
+`engine/desk.py` runs in GitHub Actions every 15 minutes while futures trade. It reads Displace's archive of free
+Yahoo futures bars (hourly since mid-2024, 5-minute bars growing since September 2026), adds Yahoo's latest bars, and
+publishes `site/data/desk.json`. The page does the live arithmetic in the browser. No keys, no server, no model API.
 
-## Native setup coverage in v4.0
+- **Unit:** the expected remaining range, the day's typical range (20-day exponential average) times the share of
+  daily movement still to come according to the hourly volatility profile.
+- **Touch odds:** for every hour of every past day, how far price went above and below that hour's close before
+  17:00 in those units, kept separately for up and down moves.
+- **Pace:** today's range so far versus what the profile expected stretches or shrinks the remaining range. It is
+  used only while it beats the plain model out of sample (Diebold–Mariano t, Bonferroni across markets) in both halves.
+- **Tests:** expanding-window refits every 20 trading days, scored on the next 20. New high/low odds are compared
+  with the plain rate for that hour; touch odds are checked for calibration. Hour-of-day direction effects are tested
+  with a Bonferroni bar across all hours and both markets (none pass). The 09:30–10:00 opening range statistics are
+  shown as "collecting" until 250 days of 5-minute bars exist.
 
-Executable now: S01, S05, S06, S09, S11, S12.
+As of November 2026 (about 420 test days): touch odds are calibrated within a point or two at every step, new
+high/low odds beat the plain hourly rate by about 24% (Brier skill), and pace adds a small, significant improvement.
 
-Fail-closed for now: S02 SMT and time-window-dependent S03/S04/S10, plus S08 session sequencing, until native timestamp/cross-market alignment extraction is certified. The engine does not invent those setups.
+`python engine/test_desk.py` checks that random walks pass no hour-of-day test and get calibrated touch odds.
 
-## Safety boundaries
+## Live Bridge
 
-- One direction, one setup, one entry, one stop, one target.
-- No TP2/TP3, runner, scale-in, backup entry, second-best trade, or alternative direction.
-- Screenshots are processed in memory and are not intentionally stored by ICT Brain.
-- No broker connectivity or order placement.
-- Confidence is deterministic visible-evidence quality, not win probability.
-- If candle reconstruction, setup evidence, OCR price grounding, or trade geometry is weak, the result is WAIT.
+`live-bridge/` is an optional Chrome/Opera extension that reads the symbol and price from TradingView tab titles so the
+desk can use the live price. See its README.
 
-## Deployment
+## History
 
-The repository root is Vercel-ready. `main` is connected to the production project, so successful pushes can redeploy automatically.
+Until November 2026 this repository held ICT Brain, a TradingView screenshot analyzer built on ICT concepts. It was
+removed because none of its setups had been tested against outcomes. It remains in the git history.
+
+Research and education only. Not investment advice.
