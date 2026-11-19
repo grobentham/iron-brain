@@ -1,5 +1,13 @@
-const SOURCE='ict-brain-web';
-function announce(){window.postMessage({source:'ict-brain-extension',type:'ICT_EXTENSION_READY',version:'1.5.0'},'*');}
-announce();
-setInterval(announce,2500);
-window.addEventListener('message',async event=>{if(event.source!==window)return;const m=event.data;if(!m||m.source!==SOURCE||m.type!=='ICT_EXTENSION_REQUEST'||!m.id)return;let response;try{response=await chrome.runtime.sendMessage(m.payload||{});}catch(error){response={ok:false,error:error?.message||'Extension request failed.'};}window.postMessage({source:'ict-brain-extension',type:'ICT_EXTENSION_RESPONSE',id:m.id,response},'*');});
+// Runs on the Iron Brain page: every few seconds asks the extension for TradingView quotes and posts them to the page.
+(function () {
+  function poll() {
+    try {
+      chrome.runtime.sendMessage({ type: "IB_QUOTES" }, res => {
+        if (chrome.runtime.lastError || !res?.ok) return;
+        window.postMessage({ source: "iron-brain-bridge", quotes: res.quotes }, window.location.origin);
+      });
+    } catch (e) { /* extension reloaded; stop quietly */ }
+  }
+  poll();
+  setInterval(poll, 5000);
+})();
