@@ -65,8 +65,8 @@ td.bar span{position:relative;font-weight:600;padding-left:6px}
 code{font-family:var(--mono);font-size:.88em;background:var(--gray);padding:1px 5px;border-radius:5px}
 #bridge-state.ok{color:var(--bull);font-weight:600}
 footer{padding:30px 22px 50px;color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);margin-top:20px}
-@media (max-width:820px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2,.cols{grid-template-columns:1fr}.gnav ul{gap:14px}.gnav ul li:nth-child(3){display:none}}
-@media (max-width:460px){.gnav ul li:nth-child(2){display:none}.stat b{font-size:1.12rem}.hero{padding-top:34px}}
+@media (max-width:820px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2,.cols{grid-template-columns:1fr}.gnav ul{gap:14px}.gnav ul li:nth-child(4),.gnav ul li:nth-child(5),.gnav ul li:nth-child(6){display:none}}
+@media (max-width:460px){.gnav ul li:nth-child(3){display:none}.gnav ul li a.out{font-size:.8rem}.acct-form label{flex-basis:100%}.stat b{font-size:1.12rem}.hero{padding-top:34px}}
 .warn{color:#c21f17}
 .lab td small{display:block;color:var(--muted);font-size:.74rem;font-weight:400}
 .lab tr.srow{cursor:pointer}.lab tr.srow:hover td{background:#fafafc}.lab tr.srow.open td{background:var(--gray)}
@@ -91,3 +91,8 @@ h3.tier{margin:18px 0 8px}h3.tier small{font-weight:400;color:var(--muted);font-
 .tierb{font-size:.68rem;font-weight:800;letter-spacing:.06em;padding:2px 8px;border-radius:99px}.tierb.tested{background:#e2f6e7;color:#127a37}.tierb.candidate{background:#fff1de;color:#a35a00}
 .scard p{margin:0 0 6px;font-size:.9rem}.sc-rule{color:var(--muted)}.sc-size{background:var(--gray);border-radius:10px;padding:6px 10px}
 details.paper{margin-top:14px;font-size:.9rem}details.paper summary{cursor:pointer;color:var(--muted)}
+.acct-form{display:flex;flex-wrap:wrap;gap:10px 16px;margin:4px 0 12px;font-size:.85rem;color:var(--muted)}
+.acct-form input,.acct-form select{font:500 .95rem var(--mono);border:1px solid var(--line);border-radius:9px;padding:4px 8px;margin-left:6px;width:110px;background:#fff}
+.acct-form select{width:auto;font-family:var(--font)}
+.tierb.research{background:#efeff4;color:#6e6e73}.scard.research{border-color:var(--line);opacity:.85}
+p.warn{color:#c21f17;font-weight:600;font-size:.9rem}
