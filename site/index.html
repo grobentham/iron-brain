@@ -53,7 +53,7 @@
         <h3>The unit: expected remaining range</h3>
         <p>A trading day runs 18:00 to 17:00 New York time. Each market’s typical daily range is tracked with a 20-day exponential average. The volatility profile measures how much of a day’s movement each hour usually carries, so at any moment the engine knows how much range is <i>still to come</i>. Levels are expressed as fractions of that remaining range.</p>
         <h3>Touch odds</h3>
-        <p>For every hour of every past day, the engine measured how far price went above and below that hour’s close before 17:00, in remaining-range units. Those distributions, kept separately for up and down moves, become the odds for any level you check.</p>
+        <p>For every hour of every past day, the engine measured how far price went above and below that hour’s close before 17:00, in remaining-range units. Those distributions, kept separately for up and down moves, become the odds for any level you check. Late in the day, with only a bar or two left, moves fall short of what a single distribution expects, so each hour can get its own (pooled with the hours either side). That is used only where it beats the shared version out of sample: so far for NQ, not gold.</p>
       </div>
       <div>
         <h3>Pace</h3>

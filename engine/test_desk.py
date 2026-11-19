@@ -59,7 +59,8 @@ def test_random_walk():
     # the profile finds the busy New York hours
     w = v["profile"]
     assert w[D.SLOT_HOURS.index(9)] > 2 * w[D.SLOT_HOURS.index(22)]
-    s = v["survUp"]
+    s = v["survUp"][D.SLOT_HOURS.index(10)] if v["byHour"] else v["survUp"]
+    assert "byHour" in v["tests"] and not v["tests"]["byHour"].get("passed") is None
     assert s[0] > 0.9 and s[-1] < 0.05 and all(a >= b for a, b in zip(s, s[1:]))
     assert v["opening"]["status"] == "tested" and v["opening"]["days"] >= 250
     assert v["today"]["scale"] and v["today"]["high"] >= v["today"]["low"]

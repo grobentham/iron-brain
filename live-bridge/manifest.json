@@ -7,7 +7,7 @@
   "host_permissions": ["https://www.tradingview.com/*"],
   "background": { "service_worker": "service-worker.js" },
   "content_scripts": [
-    { "matches": ["https://grobentham.github.io/iron-brain/*", "http://localhost/*"], "js": ["page-bridge.js"], "run_at": "document_idle" }
+    { "matches": ["https://grobentham.github.io/iron-brain/*"], "js": ["page-bridge.js"], "run_at": "document_idle" }
   ],
   "icons": { "128": "icon.png" }
 }

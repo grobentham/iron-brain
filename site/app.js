@@ -63,13 +63,15 @@
     var rho = hi > lo ? Math.log(hi / lo) / (scale * Math.sqrt(done)) : 1;
     rho = Math.min(3, Math.max(0.3, rho));
     var adj = Math.pow(rho, v.beta || 0);
+    var ci = Math.min(w.length - 2, Math.max(0, n.m < 30 ? j - 1 : j));
     return { n: n, rem: rem, done: 1 - rem, sig: sig, rho: rho, adj: adj, hi: hi, lo: lo, sameDay: sameDay, price: price,
-      open: sameDay ? today.open : null };
+      open: sameDay ? today.open : null, up: table(v.survUp, ci), dn: table(v.survDn, ci) };
   }
+  function table(t, i) { return Array.isArray(t[0]) ? t[i] : t; }
   function pTouch(v, S, level) {
     if (!(level > 0) || S.closed) return null;
     var up = level >= S.price, x = Math.abs(Math.log(level / S.price)) / S.sig / S.adj;
-    return surv(up ? v.survUp : v.survDn, v.grid, x);
+    return surv(up ? S.up : S.dn, v.grid, x);
   }
 
   /* ---- price source ---- */
@@ -77,7 +79,8 @@
     var v = D.markets[m], q = live[m];
     if (manual[m] > 0) return { p: manual[m], src: "typed" };
     if (q && Date.now() - q.at < 120e3) return { p: q.price, src: "Live Bridge · " + q.symbol };
-    return { p: v.today.last, src: "last bar " + v.today.lastTime.slice(11, 16) + " NY" };
+    var age = (Date.now() - new Date(v.today.lastTime).getTime()) / 60e3;
+    return { p: v.today.last, src: "last bar " + v.today.lastTime.slice(11, 16) + " NY", stale: age > 40 && !closed(ny(new Date())), age: age };
   }
 
   /* ---- rendering ---- */
@@ -110,7 +113,7 @@
       $("ib-level").oninput = function () { desk(false); };
     }
     if (document.activeElement !== $("ib-price")) $("ib-price").value = fmt(P.p, v).replace(/,/g, "");
-    $("ib-src").textContent = P.src;
+    $("ib-src").innerHTML = esc(P.src) + (P.stale ? ' <b class="warn">· ' + Math.round(P.age) + " min old: type the live price</b>" : "");
 
     if (S.closed) {
       $("ib-live").innerHTML = '<div class="closed">Futures are closed. The day reopens at 18:00 New York time; odds resume then.</div>';
@@ -118,7 +121,7 @@
       $("ib-profile").innerHTML = profileSvg(v, -1);
       return;
     }
-    var remPts = S.price * S.sig, upMed = inverse(v.survUp, v.grid, 0.5) * S.adj * remPts, dnMed = inverse(v.survDn, v.grid, 0.5) * S.adj * remPts;
+    var remPts = S.price * S.sig, upMed = inverse(S.up, v.grid, 0.5) * S.adj * remPts, dnMed = inverse(S.dn, v.grid, 0.5) * S.adj * remPts;
     var pHi = S.sameDay ? pTouch(v, S, S.hi + v.tick) : null, pLo = S.sameDay ? pTouch(v, S, S.lo - v.tick) : null;
     var pace = S.rho > 1.15 ? "faster than usual" : S.rho < 0.87 ? "slower than usual" : "about usual";
     $("ib-live").innerHTML =
@@ -200,8 +203,10 @@
       '<p class="fine">Averaged over every test checkpoint. Calibrated odds match their outcomes.</p></div>' +
       '<div class="card"><h3>Calibration</h3>' + calib(T.touch.reliability) + '<p class="fine">Each dot groups predictions of similar size; on the line means they came true as often as stated.</p></div></div>' +
       '<div class="card"><h3>Model tests</h3><table class="t"><thead><tr><th>Test</th><th class="n">Skill</th><th class="n">t</th><th class="n">Halves</th><th>Result</th></tr></thead><tbody>' + ex +
+      (T.byHour ? "<tr><td>Separate odds for each hour</td><td class=\"n\">" + (T.byHour.skill * 100).toFixed(1) + '%</td><td class="n">' + T.byHour.t.toFixed(1) + '</td><td class="n">' + (T.byHour.halves[0] * 100).toFixed(1) + " / " + (T.byHour.halves[1] * 100).toFixed(1) + "%</td><td>" + res(T.byHour.passed) + "</td></tr>" : "") +
       "<tr><td>Pace (today’s speed so far)</td><td class=\"n\">" + (pace.skill * 100).toFixed(1) + '%</td><td class="n">' + pace.t.toFixed(1) + '</td><td class="n">' + (pace.halves[0] * 100).toFixed(1) + " / " + (pace.halves[1] * 100).toFixed(1) + "%</td><td>" + res(pace.passed) + "</td></tr></tbody></table>" +
-      '<p class="fine">Skill is the out-of-sample improvement in Brier score. New high/low odds are compared with the plain rate for that hour and need t ≥ ' + bars.extreme.toFixed(2) + "; pace is compared with the same model without it and needs t ≥ " + bars.pace.toFixed(2) + ". Both need positive skill in each half of the test.</p></div>" +
+      '<p class="fine">Skill is the out-of-sample improvement in Brier score. New high/low odds are compared with the plain rate for that hour and need t ≥ ' + bars.extreme.toFixed(2) + "; Separate hourly odds and pace are each compared with the model without them and need t ≥ " + bars.pace.toFixed(2) + ". Every test needs positive skill in each half. These check the quality of the odds, not a trading edge." +
+      (T.byHour ? " Worst gap at any single hour between the odds and what happened (½ step): " + Math.round((v.byHour ? T.byHour.worstHourGapByHour : T.byHour.worstHourGap) * 100) + " points" + (v.byHour ? "." : ", mostly late in the New York afternoon, where these odds run high.") : "") + "</p></div>" +
       '<div class="grid2"><div class="card"><h3>Hour-of-day direction</h3><div class="scroll"><table class="t"><thead><tr><th>Hour</th><th class="n">Up</th><th class="n">Average</th><th class="n">z / t</th><th>Result</th></tr></thead><tbody>' + hours + "</tbody></table></div>" +
       '<p class="fine">Passing needs |z| and |t| ≥ ' + bars.hour.toFixed(2) + " (5% split across every hour in both markets) and the same side in both halves.</p></div>" +
       '<div class="card"><h3>Opening range (09:30–10:00)</h3>' + (o.days ? '<p class="status ' + o.status + '">' + (o.status === "tested" ? "Tested" : "Collecting: " + o.days + " of " + o.need + " days") + "</p>" +
