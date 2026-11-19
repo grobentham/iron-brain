@@ -12,7 +12,7 @@ jobs:
       - run: python3 engine/history.py
       - name: Push the history to a scratch branch
         run: |
-          mkdir /tmp/out && cp -r engine/cache/duka /tmp/out/
+          mkdir /tmp/out && cp -r engine/cache/duka-mid /tmp/out/duka
           cd /tmp/out && git init -q -b scratch-history && git add duka
           git -c user.name=bot -c user.email=bot@example.com commit -q -m "Dukascopy hourly history snapshot"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" scratch-history

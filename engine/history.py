@@ -2,7 +2,9 @@
 
 Dukascopy publishes one small file of hourly candles per instrument per month:
   https://datafeed.dukascopy.com/datafeed/{INSTRUMENT}/{year}/{month-1:02d}/BID_candles_hour_1.bi5
-Each record is 24 bytes: seconds from the month start, open, close, low, high (prices x 1000) and volume.
+Each record is 24 bytes: seconds from the month start, open, close, low, high (prices x 1000) and volume. Bid and
+ask candles are both fetched and averaged into mid prices: bid quotes alone dip when the spread widens around the
+daily 17:00 New York break and recover at the reopen, which looks like a price pattern but is not one.
 Hours with no trading (weekends, breaks) are flat with zero volume and are dropped. Finished months are cached and
 never fetched again; only the current month is refreshed.
 """
@@ -17,10 +19,10 @@ import urllib.error
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE = os.path.join(HERE, "cache", "duka")
+CACHE = os.path.join(HERE, "cache", "duka-mid")
 INSTRUMENTS = {"nq": "USATECHIDXUSD", "gold": "XAUUSD"}
 START = (2010, 1)
-URL = "https://datafeed.dukascopy.com/datafeed/{inst}/{y}/{m:02d}/BID_candles_hour_1.bi5"
+URL = "https://datafeed.dukascopy.com/datafeed/{inst}/{y}/{m:02d}/{side}_candles_hour_1.bi5"
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36"}
 
 
@@ -31,9 +33,18 @@ def months(now):
         y, m = (y + 1, 1) if m == 12 else (y, m + 1)
 
 
-def fetch_month(inst, y, m, tries=5):
-    """{iso utc hour: [o,h,l,c]} for one month, or None if it could not be fetched."""
-    url = URL.format(inst=inst, y=y, m=m - 1)
+def fetch_month(inst, y, m):
+    """Mid-price candles for one month: the average of the bid and ask candles, so that the spread widening around
+    the daily break does not show up as a fake price move. None if it could not be fetched."""
+    bid, ask = fetch_side(inst, y, m, "BID"), fetch_side(inst, y, m, "ASK")
+    if bid is None or ask is None:
+        return None
+    return {t: [round((b + a) / 2, 4) for b, a in zip(bid[t], ask[t])] for t in bid if t in ask}
+
+
+def fetch_side(inst, y, m, side, tries=5):
+    """{iso utc hour: [o,h,l,c]} of one side's candles for one month, or None if it could not be fetched."""
+    url = URL.format(inst=inst, y=y, m=m - 1, side=side)
     base = dt.datetime(y, m, 1, tzinfo=dt.timezone.utc)
     for i in range(tries):
         try:
