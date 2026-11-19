@@ -2,7 +2,8 @@
    out here from the current price and New York time. */
 (function () {
   "use strict";
-  var D = null, B = null, cur = "nq", live = {}, manual = {};
+  var D = null, B = null, Q = null, cur = "nq", live = {}, manual = {};
+  var QUOTES = "https://raw.githubusercontent.com/grobentham/iron-brain/quotes/quotes.json";
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   var pc = function (p) { return p == null || !isFinite(p) ? "—" : (p < 0.01 && p > 0 ? "<1%" : p > 0.99 && p < 1 ? ">99%" : Math.round(p * 100) + "%"); };
@@ -26,6 +27,7 @@
     NYF.formatToParts(t).forEach(function (x) { p[x.type] = x.value; });
     return { wd: p.weekday, date: p.year + "-" + p.month + "-" + p.day, h: Number(p.hour) % 24, m: Number(p.minute) };
   }
+  function nyTime(iso) { var n = ny(new Date(iso)); return pad(n.h) + ":" + pad(n.m); }
   function dayKey(t) { return ny(new Date(t.getTime() + 6 * 3600e3)).date; }
   function closed(n) {
     if (n.wd === "Sat") return true;
@@ -58,7 +60,12 @@
     for (var k = j + 1; k <= last; k++) rem += w[k];
     rem = Math.max(1e-4, rem);
     var done = Math.max(w[0] * 0.25, 1 - rem), sameDay = today && today.day === key;
+    var mk = Object.keys(D.markets).filter(function (k) { return D.markets[k] === v; })[0];
+    var fq = Q && Q.markets && Q.markets[mk];
     var hi = sameDay ? Math.max(today.high, price) : price, lo = sameDay ? Math.min(today.low, price) : price;
+    if (fq && fq.day === key && fq.high && fq.low) {   // the minute feed has today's range: use it
+      hi = Math.max(hi, fq.high); lo = Math.min(lo, fq.low); sameDay = true;
+    }
     var scale = today && today.scale;
     if (!scale) return { closed: true, n: n };
     var sig = scale * Math.sqrt(rem);
@@ -67,7 +74,7 @@
     var adj = Math.pow(rho, v.beta || 0);
     var ci = Math.min(last - 1, Math.max(0, n.m < 30 ? j - 1 : j));
     return { n: n, rem: rem, done: 1 - rem, sig: sig, rho: rho, adj: adj, hi: hi, lo: lo, sameDay: sameDay, price: price,
-      open: sameDay ? today.open : null, up: table(v.survUp, ci), dn: table(v.survDn, ci) };
+      open: today && today.day === key ? today.open : null, up: table(v.survUp, ci), dn: table(v.survDn, ci) };
   }
   function table(t, i) { return Array.isArray(t[0]) ? t[i] : t; }
   function pTouch(v, S, level) {
@@ -80,9 +87,14 @@
   function priceOf(m) {
     var v = D.markets[m], q = live[m];
     if (manual[m] > 0) return { p: manual[m], src: "typed" };
-    if (q && Date.now() - q.at < 120e3) return { p: q.price, src: "Live Bridge · " + q.symbol };
+    if (q && Date.now() - q.at < 120e3) return { p: q.price, src: "Live from TradingView (" + q.symbol + ")", live: true };
+    var fq = Q && Q.markets && Q.markets[m];
+    if (fq && new Date(fq.time) >= new Date(v.today.lastTime)) {
+      var qa = (Date.now() - new Date(fq.time).getTime()) / 60e3;
+      return { p: fq.price, src: "Updates every minute · " + nyTime(fq.time) + " New York, delayed about 10 min", stale: qa > 30 && sessionOpen(), age: qa };
+    }
     var age = (Date.now() - new Date(v.today.lastTime).getTime()) / 60e3;
-    return { p: v.today.last, src: "last bar " + v.today.lastTime.slice(11, 16) + " NY", stale: age > 40 && sessionOpen(), age: age };
+    return { p: v.today.last, src: "Last bar " + v.today.lastTime.slice(11, 16) + " New York", stale: age > 40 && sessionOpen(), age: age };
   }
 
   /* ---- rendering ---- */
@@ -120,7 +132,7 @@
       $("ib-level").oninput = function () { desk(false); };
     }
     if (document.activeElement !== $("ib-price")) $("ib-price").value = fmt(P.p, v).replace(/,/g, "");
-    $("ib-src").innerHTML = esc(P.src) + (P.stale ? ' <b class="warn">· ' + Math.round(P.age) + " min old: type the live price</b>" : "");
+    $("ib-src").innerHTML = (P.live ? '<span class="dot"></span>' : "") + esc(P.src) + (P.stale ? ' <b class="warn">· ' + Math.round(P.age) + " min old: type the live price</b>" : "");
 
     $("ib-sig").innerHTML = sigLine();
     if (S.closed) {
@@ -452,6 +464,13 @@
   });
 
   /* ---- boot ---- */
+  function loadQuotes() {
+    if (document.hidden) return;
+    fetch(QUOTES + "?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (q) {
+      if (q && q.markets) { Q = q; desk(false); chrome_(); }
+    }).catch(function () {});
+  }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) loadQuotes(); });
   function load() {
     return fetch("data/desk.json?t=" + Date.now()).then(function (r) { return r.json(); }).then(function (d) {
       D = d;
@@ -463,6 +482,7 @@
     route(); tabs(); acctView(); signalsView(); desk(true); labView(); testsView(); ctx(); chrome_();
     fetch("/displace/data/bias/current.json?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (b) { B = b; ctx(); }).catch(function () { ctx(); });
     setInterval(function () { desk(false); chrome_(); }, 15000);
+    loadQuotes(); setInterval(loadQuotes, 60000);
     setInterval(function () { load().then(function () { desk(false); signalsView(); }); }, 300000);
   }).catch(function () { $("desk-body").innerHTML = '<p class="muted">The desk data isn’t available yet.</p>'; });
   window.IB = { state: state, pTouch: pTouch, surv: surv };

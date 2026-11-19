@@ -1,19 +1,21 @@
 name: Ticker
 
-# Backup for GitHub's cron, which can be late or never fire on a repository's new schedules.
-# Starts the desk every 15 minutes while futures trade, then restarts itself before its 6-hour job limit.
-# A cron every 6 hours revives the chain if it ever stops. Uses only the built-in GITHUB_TOKEN.
+# Keeps the desk current while futures trade:
+#   - about once a minute, publishes the latest NQ and gold prices to the `quotes` branch (quotes.json),
+#     which the page polls every minute;
+#   - every 15 minutes, starts the desk workflow (GitHub's own cron can be late or never fire).
+# Restarts itself before the 6-hour job limit; a cron every 6 hours revives the chain if it stops.
 on:
   workflow_dispatch:
   schedule:
     - cron: "7 */6 * * *"
   push:
     branches: [main]
-    paths: [".github/workflows/ticker.yml"]
+    paths: [".github/workflows/ticker.yml", "engine/quotes.py"]
 
 permissions:
   actions: write
-  contents: read
+  contents: write
 
 concurrency:
   group: ticker
@@ -24,28 +26,43 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
-      - name: Start the desk every 15 minutes for about 5 hours
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet "numpy>=2,<3"
+      - name: Prices every minute, the desk every 15 minutes, for about 5 hours
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          end=$(( $(date +%s) + 5*3600 ))
+          mkdir -p /tmp/q && cd /tmp/q && git init -q -b quotes
+          git config user.name iron-brain && git config user.email iron-brain@users.noreply.github.com
+          cd "$GITHUB_WORKSPACE"
+          end=$(( $(date +%s) + 5*3600 )); last_desk=0
           while [ "$(date +%s)" -lt "$end" ]; do
-            dow=$(date -u +%u); hour=$(date -u +%H)
+            dow=$(date -u +%u); hour=$(date -u +%H); open=1
             # futures trade from Sunday 22:00/23:00 UTC to Friday 21:00/22:00 UTC
-            open=1
             if [ "$dow" = "6" ]; then open=0; fi
             if [ "$dow" = "7" ] && [ "$hour" -lt 22 ]; then open=0; fi
             if [ "$dow" = "5" ] && [ "$hour" -ge 22 ]; then open=0; fi
             if [ "$open" = "1" ]; then
-              since=$(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
-              recent=$(gh run list -R "$REPO" --workflow desk.yml --branch main --limit 5 --json createdAt,event \
-                --jq "[.[] | select(.createdAt > \"$since\" and .event != \"pull_request\")] | length")
-              if [ "$recent" = "0" ]; then gh workflow run desk.yml -R "$REPO" --ref main && echo "$(date -u +%H:%M) desk started"; else echo "$(date -u +%H:%M) desk ran recently"; fi
+              if (cd engine && python quotes.py /tmp/q/quotes.json); then
+                (cd /tmp/q && git add quotes.json && git commit -q --amend --allow-empty -m "Latest prices" 2>/dev/null || git commit -q -m "Latest prices"
+                 git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" quotes) || echo "quote push failed"
+              fi
+              now=$(date +%s)
+              if [ $(( now - last_desk )) -ge 900 ]; then
+                since=$(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
+                recent=$(gh run list -R "$REPO" --workflow desk.yml --branch main --limit 5 --json createdAt,event \
+                  --jq "[.[] | select(.createdAt > \"$since\" and .event != \"pull_request\")] | length")
+                if [ "$recent" = "0" ]; then gh workflow run desk.yml -R "$REPO" --ref main && echo "$(date -u +%H:%M) desk started"; fi
+                last_desk=$now
+              fi
+              sleep 55
             else
-              echo "$(date -u +%H:%M) market closed"
+              echo "$(date -u +%H:%M) market closed"; sleep 900
             fi
-            sleep 900
           done
       - name: Restart the ticker
         if: ${{ !cancelled() }}
