@@ -76,10 +76,12 @@ walks pass nothing.
 ## Signals and alerts
 
 The Signals panel at the top of the page has three tiers. **Tested** strategies passed every check and are the only
-real signals (none yet). **Candidates** passed everything except the deflated Sharpe and are shown as provisional
-signals with their next trigger, position size and forward record (as of November 2026: NQ's 200-day trend filter
-and gold's turn of the month). Everything else is **paper**, listed for the record. A candidate becomes tested only
-if its deflated Sharpe reaches 0.95 as data accumulates; the bar is never lowered.
+real signals. **Candidates** ("promising": every check holds and significant on its own, but not past the
+multiple-testing bar) are shown as provisional signals with their next trigger, position size and forward record. As of November 2026 the tested signals are NQ's
+200-day trend filter and gold's turn of the month. Everything else is **paper**, listed for the record.
+
+The desk runs every 15 minutes while futures trade. GitHub's own cron is unreliable on new schedules, so the Ticker
+workflow starts the desk on time and restarts itself; a 6-hourly cron revives it if the chain stops.
 
 `engine/alerts.py` runs after each scheduled engine run and compares the new signals with the ones live on the site.
 When a tested or candidate signal appears or changes, it opens an issue labelled `signal` in this repository, so
