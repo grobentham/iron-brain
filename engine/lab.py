@@ -448,8 +448,8 @@ def live_daily(st, p, dates, c):
     if st["id"] == "trend-200" and len(c) >= 200:
         avg = float(c[-200:].mean())
         out["level"] = round(avg, 2)
-        out["next"] = ("Stays long while closes hold above the 200-day average (%.2f)." if pos else
-                       "Goes long after a close above the 200-day average (%.2f).") % avg
+        out["next"] = ("Stays long while closes hold above the 200-day average ({:,.2f})." if pos else
+                       "Goes long after a close above the 200-day average ({:,.2f}).").format(avg)
     elif st["id"] == "turn-of-month":
         if pos:
             out["next"] = "Long through the close of the month's third trading day."
@@ -460,7 +460,7 @@ def live_daily(st, p, dates, c):
             out["next"] = "Next entry at the close on %s (last trading day of the month; check holidays)." % d.isoformat()
             out["nextDate"] = d.isoformat()
     elif st["id"] == "momentum-20" and len(c) > 20:
-        out["next"] = "Flips when the close crosses %.2f, the close 20 sessions ago." % float(c[-20])
+        out["next"] = "Flips when the close crosses {:,.2f}, the close 20 sessions ago.".format(float(c[-20]))
     return out
 
 

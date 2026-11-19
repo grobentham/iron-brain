@@ -188,7 +188,7 @@
     if (!Lb) { $("sig-body").innerHTML = '<p class="muted">The strategy lab hasn’t run yet.</p>'; return; }
     var all = Lb.strategies, tested = all.filter(function (x) { return x.tier === "tested"; }), cand = all.filter(function (x) { return x.tier === "candidate"; });
     var paper = all.filter(function (x) { return x.tier === "paper" && x.live && x.live.state === "signal"; });
-    var risk = Number(store.get("ib-risk") || 500);
+    var risk = Number(store.get("ib-risk") || 1000);
     var html = '<div class="sig-sum"><span><b>' + tested.length + "</b> tested</span><span><b>" + cand.length + "</b> candidate" + (cand.length === 1 ? "" : "s") + "</span><span><b>" + (all.length - tested.length - cand.length) + "</b> paper</span>" +
       '<label class="riskin">Risk per trade $<input id="sig-risk" inputmode="decimal" value="' + risk + '"></label></div>';
     html += '<h3 class="tier">Tested</h3>' + (tested.length ? '<div class="sig-grid">' + tested.map(function (x) { return sigCard(x, risk); }).join("") + "</div>" :

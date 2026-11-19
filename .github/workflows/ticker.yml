@@ -1,0 +1,54 @@
+name: Ticker
+
+# Backup for GitHub's cron, which can be late or never fire on a repository's new schedules.
+# Starts the desk every 15 minutes while futures trade, then restarts itself before its 6-hour job limit.
+# A cron every 6 hours revives the chain if it ever stops. Uses only the built-in GITHUB_TOKEN.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7 */6 * * *"
+  push:
+    branches: [main]
+    paths: [".github/workflows/ticker.yml"]
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: ticker
+  cancel-in-progress: true
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Start the desk every 15 minutes for about 5 hours
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          end=$(( $(date +%s) + 5*3600 ))
+          while [ "$(date +%s)" -lt "$end" ]; do
+            dow=$(date -u +%u); hour=$(date -u +%H)
+            # futures trade from Sunday 22:00/23:00 UTC to Friday 21:00/22:00 UTC
+            open=1
+            if [ "$dow" = "6" ]; then open=0; fi
+            if [ "$dow" = "7" ] && [ "$hour" -lt 22 ]; then open=0; fi
+            if [ "$dow" = "5" ] && [ "$hour" -ge 22 ]; then open=0; fi
+            if [ "$open" = "1" ]; then
+              since=$(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
+              recent=$(gh run list -R "$REPO" --workflow desk.yml --branch main --limit 5 --json createdAt,event \
+                --jq "[.[] | select(.createdAt > \"$since\" and .event != \"pull_request\")] | length")
+              if [ "$recent" = "0" ]; then gh workflow run desk.yml -R "$REPO" --ref main && echo "$(date -u +%H:%M) desk started"; else echo "$(date -u +%H:%M) desk ran recently"; fi
+            else
+              echo "$(date -u +%H:%M) market closed"
+            fi
+            sleep 900
+          done
+      - name: Restart the ticker
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ticker.yml -R "${{ github.repository }}" --ref main
