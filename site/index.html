@@ -15,6 +15,7 @@
     <a class="brand" href="#top"><img src="icon.svg" width="26" height="26" alt="">Iron Brain</a>
     <ul>
       <li><a href="#desk">Desk</a></li>
+      <li><a href="#lab">Strategies</a></li>
       <li><a href="#tests">Tests</a></li>
       <li><a href="#method">Method</a></li>
       <li><a class="out" href="/displace/#bias">Displace daily bias ›</a></li>
@@ -40,6 +41,12 @@
     <div id="ctx"><p class="muted">Loading Displace’s daily bias…</p></div>
   </section>
 
+  <section id="lab" class="wide">
+    <h2>Strategy lab</h2>
+    <p class="sub">Trading rules written down before testing, with fixed parameters, real costs and a forward record. A strategy reaches the desk only if it passes every check.</p>
+    <div id="lab-body"><p class="muted">Loading the strategy lab…</p></div>
+  </section>
+
   <section id="tests" class="wide">
     <h2>How the numbers held up</h2>
     <p class="sub">Walk-forward: the model is refit every 20 trading days on earlier days only and scored on the next 20.</p>
@@ -58,6 +65,8 @@
       <div>
         <h3>Pace</h3>
         <p>A fast day tends to stay fast. Today’s range so far, compared with what the profile expected by now, stretches or shrinks the remaining range. This adjustment is used only because it beat the plain model out of sample in both halves of the test.</p>
+        <h3>Strategy lab</h3>
+        <p>Every strategy was registered on 19 November 2026 with fixed rules, before any was run, and each is tested on both markets. Intraday rules decide on completed hourly bars, enter at the next bar’s open, check stops before targets inside a bar and are flat by 17:00. Daily rules trade close to close. Costs are about one tick of slippage each side plus commission. To pass, a rule needs a t-statistic past one Bonferroni bar across every test, must beat 95% of 200 runs of the same rule at random times, must be profitable in both halves of its history and over the last year, and needs a deflated Sharpe ratio of at least 0.95. Trades after the registration date form a forward record the rules could not have been tuned on.</p>
         <h3>What failed</h3>
         <p>No hour of the day closes up more often than chance once you account for testing every hour in both markets. The desk shows those tests but leans on none of them. The opening-range statistics are still collecting: there are only about 60 days of free 5-minute bars, and they need 250 before they count.</p>
       </div>

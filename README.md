@@ -37,6 +37,28 @@ high/low odds beat the plain hourly rate by about 24% (Brier skill), and pace ad
 
 `python engine/test_desk.py` checks that random walks pass no hour-of-day test and get calibrated touch odds.
 
+## Strategy lab
+
+`engine/lab.py` holds eleven trading rules registered on 19 November 2026 with fixed parameters, before any was
+run: six intraday (range exhaustion fade, opening drive, overnight move fade, overnight drift long, late-day momentum,
+fast trend day) and five daily (20-day momentum, buy the big down day, 200-day trend filter, turn of the month,
+weekly reversal). Each runs on NQ and gold, so 22 tests share one multiple-testing bar.
+
+- Intraday rules decide on completed hourly bars, enter at the next bar's open, check stops before targets inside a
+  bar (a gap through the stop fills at the open) and are flat by 17:00. Daily rules trade close to close.
+- Costs: NQ 0.75 points and gold 0.3 points per round trip.
+- To pass: t of daily net returns past the one-sided Bonferroni bar (2.84 for 22 tests), beat 95% of 200 random-timing
+  runs of the same rule, profit in both halves and over the last 250 days, deflated Sharpe ratio ≥ 0.95, and enough
+  trades. Only passing rules would show as signals on the desk; the rest are shown as paper.
+- Every trade after the registration date is a forward record, recomputed from data on every run.
+
+As of November 2026 none of the 22 passes. Closest: NQ's 200-day trend filter (t 3.27, beat 98% of random runs) and
+gold's turn of the month (t 3.08, beat 100%), each failing only the deflated Sharpe (0.91 and 0.88). Rules are never
+edited; a new idea is registered as a new strategy, which raises the bar for all of them.
+
+`python engine/test_lab.py` checks that rules never use future bars, that fills are conservative, and that random
+walks pass nothing.
+
 ## Live Bridge
 
 `live-bridge/` is an optional Chrome/Opera extension that reads the symbol and price from TradingView tab titles so the

@@ -28,7 +28,9 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install --quiet "numpy>=2,<3"
       - name: Engine tests
-        run: python engine/test_desk.py
+        run: |
+          python engine/test_desk.py
+          python engine/test_lab.py
       - name: Page and extension syntax
         run: |
           node --check site/app.js
