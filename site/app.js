@@ -464,11 +464,16 @@
   });
 
   /* ---- boot ---- */
+  // GitHub's contents API refreshes within a minute (raw.githubusercontent.com caches for five); unchanged replies
+  // are "not modified" and don't count against its hourly limit. The raw file is the fallback.
+  var QUOTES_API = "https://api.github.com/repos/grobentham/iron-brain/contents/quotes.json?ref=quotes";
+  function useQuotes(q) { if (q && q.markets && (!Q || q.updated >= Q.updated)) { Q = q; desk(false); chrome_(); } }
   function loadQuotes() {
     if (document.hidden) return;
-    fetch(QUOTES + "?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (q) {
-      if (q && q.markets) { Q = q; desk(false); chrome_(); }
-    }).catch(function () {});
+    fetch(QUOTES_API, { headers: { Accept: "application/vnd.github.raw+json" }, cache: "no-cache" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(useQuotes)
+      .catch(function () { fetch(QUOTES + "?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(useQuotes).catch(function () {}); });
   }
   document.addEventListener("visibilitychange", function () { if (!document.hidden) loadQuotes(); });
   function load() {
