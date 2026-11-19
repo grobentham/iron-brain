@@ -29,7 +29,7 @@
     <p class="eyebrow">Intraday desk · NQ and gold futures</p>
     <h1>Where price can still go today.</h1>
     <p class="lede">From the current price and time, the odds of reaching each level before the 17:00 New York close, and of the day still making a new high or low. Every number is scored on days the model had not seen.</p>
-    <p class="note">Statistics, not trade signals. Prices from free futures bars, delayed up to about 20 minutes unless you type the live price or connect Live Bridge.</p>
+    <p class="note">Statistics and tested signals only. Prices from free futures bars, delayed up to about 20 minutes unless you type the live price or connect Live Bridge.</p>
   </header>
 
   <section id="signals" class="wide">
@@ -73,7 +73,7 @@
         <h3>Pace</h3>
         <p>A fast day tends to stay fast. Today’s range so far, compared with what the profile expected by now, stretches or shrinks the remaining range. This adjustment is used only because it beat the plain model out of sample in both halves of the test.</p>
         <h3>Strategy lab</h3>
-        <p>Every strategy was registered on 19 November 2026 with fixed rules, before any was run, and each is tested on both markets. Intraday rules decide on completed hourly bars, enter at the next bar’s open, check stops before targets inside a bar and are flat by 17:00. Daily rules trade close to close. Costs are about one tick of slippage each side plus commission. To pass, a rule needs a t-statistic past one Bonferroni bar across every test, must beat 95% of 200 runs of the same rule at random times, must be profitable in both halves of its history and over the last year, and needs a deflated Sharpe ratio of at least 0.95. Trades after the registration date form a forward record the rules could not have been tuned on.</p>
+        <p>Every strategy was registered on 19 November 2026 with fixed rules, before any was run, and each is tested on both markets. Intraday rules decide on completed hourly bars, enter at the next bar’s open, check stops before targets inside a bar and are flat by 17:00. Daily rules trade close to close. Costs are about one tick of slippage each side plus commission. To pass, a rule needs a t-statistic past one Bonferroni bar across every test, must beat 95% of 200 runs of the same rule at random times, and must be profitable in both halves of its history and over the last year. Each test also reports the smallest edge its data could detect, so a rule that couldn’t be judged is labelled inconclusive rather than failed. Intraday history: Dukascopy hourly mid prices (gold from 2010, NQ from 2018) until mid-2024, futures bars after. Trades after the registration date form a forward record the rules could not have been tuned on.</p>
         <h3>What failed</h3>
         <p>No hour of the day closes up more often than chance once you account for testing every hour in both markets. The desk shows those tests but leans on none of them. The opening-range statistics are still collecting: there are only about 60 days of free 5-minute bars, and they need 250 before they count.</p>
       </div>

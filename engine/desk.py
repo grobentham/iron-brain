@@ -439,9 +439,29 @@ def today_state(days, s_last, R, rows1, rows5, now):
             "prevClose": float(days[prior[-1]][4][-1]) if prior else None}
 
 
-def run_market(m, source=None, fresh=True, now=None, log=print):
+HISTORY_START = {"nq": "2018-01-01", "gold": "2010-01-01"}  # first years with complete 23-hour days
+
+
+def merge_history(futures, older):
+    """Futures bars wherever they exist; the older source only for trading days before the first futures day."""
+    if not older:
+        return futures
+    fut_rows = to_ny(futures)
+    if not fut_rows:
+        return older
+    first = day_key(fut_rows[0][0])
+    out = {t: v for t, v in older.items() if day_key(dt.datetime.fromisoformat(t).astimezone(NY)) < first}
+    out.update(futures)
+    return out
+
+
+def run_market(m, source=None, fresh=True, now=None, log=print, history=None):
     now = now or dt.datetime.now(dt.timezone.utc)
-    rows1 = to_ny(load_bars(m, "1h", source, fresh, log))
+    older = history(m) if history else {}
+    start = HISTORY_START.get(m)
+    if start:
+        older = {t: v for t, v in older.items() if t >= start}
+    rows1 = to_ny(merge_history(load_bars(m, "1h", source, fresh, log), older))
     rows5 = to_ny(load_bars(m, "5m", source, fresh, log))
     days = hourly_days(rows1)
     if len(days) < WARM + 60:
@@ -486,17 +506,18 @@ def finish(m, r, hour_bar, pace_bar, extreme_bar):
         "tests": ev, "hourly": hour_tests(days[SPAN:], hour_bar),
         "opening": opening_range(r["rows5"]),
         "today": today_state(days, r["s"], r["R"], r["rows1"], r["rows5"], r["now"]),
-        "history": {"days": len(days), "from": str(days[0][0]), "to": str(days[-1][0])},
+        "history": {"days": len(days), "from": str(days[0][0]), "to": str(days[-1][0]),
+                    "sources": "Dukascopy hourly (index CFD / spot) before mid-2024, Yahoo futures after"},
     }
 
 
-def run(source=None, fresh=True, now=None, out=OUT, log=print):
+def run(source=None, fresh=True, now=None, out=OUT, log=print, history=None):
     t0 = time.time()
     now = now or dt.datetime.now(dt.timezone.utc)
     raw = {}
     for m in MARKETS:
         try:
-            r = run_market(m, source, fresh, now, log)
+            r = run_market(m, source, fresh, now, log, history)
         except Exception as e:  # one market failing must not stop the other
             log(f"desk: {m} failed ({e!r})")
             r = None
@@ -530,5 +551,6 @@ def run(source=None, fresh=True, now=None, out=OUT, log=print):
 
 
 if __name__ == "__main__":
+    import history as HIST
     src = sys.argv[1] if len(sys.argv) > 1 else None
-    run(source=src, fresh=src is None)
+    run(source=src, fresh=src is None, history=HIST.load)
