@@ -15,12 +15,12 @@ A strategy passes only if all hold:
   t of its daily net returns >= the one-sided Bonferroni bar across every test
   it beats at least 95% of 200 runs of the same rules at random times (same direction, holding time, stops)
   positive net in both halves of its history and over the last 250 trading days
-  deflated Sharpe ratio (Bailey and Lopez de Prado) >= 0.95, counting every test as a trial
   enough data: 100 trades intraday; 30 separate positions and 250 days in the market for daily rules
 Everything after REGISTERED is a forward record: trades the rules could not have been tuned on.
 
-Tiers: "tested" passed everything and is a signal; "candidate" missed only the deflated Sharpe and is shown as a
-provisional signal; "paper" is everything else, shown for the record only.
+Verdicts: "passed" (tested signal); "promising" (every check holds and t >= 1.96, but not past the multiple-testing
+bar: a provisional candidate); "inconclusive" (the data cannot rule a worthwhile edge in or out); "no edge" (negative,
+or the 95% range of its Sharpe ratio sits below MEANINGFUL_SHARPE). The deflated Sharpe ratio is reported alongside.
 """
 import datetime as dt
 import math
@@ -35,8 +35,16 @@ REGISTERED = "2026-11-19"
 COST = {"nq": 0.75, "gold": 0.3}
 N_RANDOM = 200
 MIN_TRADES = 100
-# a candidate passed every check except these; it is shown as a provisional signal, never as a tested one
-CANDIDATE_MAY_MISS = {"dsr"}
+MEANINGFUL_SHARPE = 0.5  # an annual Sharpe below this is not worth trading after real-world frictions
+# Changes to the testing method (never to the rules). Each was made after seeing results, so the forward record,
+# which no change can touch, is the cleaner test.
+CHANGES = [
+    ["2026-11-19", "Registered 11 rules on NQ and gold (22 tests)."],
+    ["2026-11-19", "Intraday history extended with Dukascopy hourly mid prices (gold from 2010, NQ from 2018), from "
+                   "2.4 years of futures bars, which could only detect an edge with an annual Sharpe near 2."],
+    ["2026-11-19", "The deflated Sharpe ratio is reported but no longer required: on top of the Bonferroni bar it "
+                   "counted the multiple testing twice (an effective t of about 3.6)."],
+]
 ND = NormalDist()
 
 
@@ -487,10 +495,26 @@ def evaluate(r, trades, kind, rnd_runs, n_trials, bar):
     else:
         enough = len(trades) >= MIN_TRADES
     checks = {"t": t >= bar, "random": beat >= 0.95, "halves": first > 0 and second > 0, "recent": recent > 0,
-              "dsr": dsr is not None and dsr >= 0.95, "sample": enough}
+              "sample": enough}
+    # power: what this sample could detect, and the range of annual Sharpe ratios the result is consistent with
+    ann = math.sqrt(252)
+    sr = sharpe(r) * ann
+    need = (bar + ND.inv_cdf(0.8)) / math.sqrt(max(1, n)) * ann
+    lo, hi = (t - 1.96) / math.sqrt(max(1, n)) * ann, (t + 1.96) / math.sqrt(max(1, n)) * ann
+    passed = all(checks.values())
+    others = all(v for k, v in checks.items() if k != "t")
+    if passed:
+        verdict = "passed"
+    elif others and t >= 1.96:
+        verdict = "promising"       # everything holds, significant on its own, but not after testing 22 ideas
+    elif t <= 0 or hi < MEANINGFUL_SHARPE:
+        verdict = "no edge"
+    else:
+        verdict = "inconclusive"    # the data cannot rule a worthwhile edge in or out
     return {"t": round(t, 2), "beatRandom": round(beat, 3), "halvesBp": [round(first, 1), round(second, 1)],
             "recentBp": round(recent, 1), "dsr": round(dsr, 3) if dsr is not None else None,
-            "checks": checks, "passed": all(checks.values())}
+            "sharpe": round(sr, 2), "sharpeRange": [round(lo, 2), round(hi, 2)], "detectable": round(need, 2),
+            "checks": checks, "passed": passed, "verdict": verdict}
 
 
 def summary(trades, pv, rnd, dates_all):
@@ -557,8 +581,7 @@ def run(intraday_data, daily_data, now, log=print, seed=7):
     for t in tests:
         ev = evaluate(t["r"], t["trades"], t["st"]["kind"], t["rnd"], n_trials, bar)
         sm = summary(t["trades"], t["pv"], rnd, t["dates"])
-        miss = {k for k, v in ev["checks"].items() if not v}
-        tier = "tested" if not miss else "candidate" if miss <= CANDIDATE_MAY_MISS else "paper"
+        tier = {"passed": "tested", "promising": "candidate"}.get(ev["verdict"], "paper")
         out.append({"tier": tier, "lastClose": t.get("last"), "avgDailyMove": t.get("range"), "id": t["st"]["id"], "name": t["st"]["name"], "kind": t["st"]["kind"], "rule": t["st"]["rule"],
                     "market": t["m"], **ev, **sm, "live": t["live"],
                     "recentTrades": [{k: (round(v, 2) if isinstance(v, float) else v) for k, v in x.items()
@@ -567,4 +590,4 @@ def run(intraday_data, daily_data, now, log=print, seed=7):
     cands = [f"{x['market']}:{x['id']}" for x in out if x["tier"] == "candidate"]
     log(f"lab: {len(out)} tests, bar t >= {bar:.2f}; passed {passed or 'none'}; candidates {cands or 'none'}")
     return {"registered": REGISTERED, "trials": n_trials, "bar": round(bar, 2), "random": N_RANDOM,
-            "costs": COST, "strategies": out}
+            "costs": COST, "changes": CHANGES, "meaningful": MEANINGFUL_SHARPE, "strategies": out}

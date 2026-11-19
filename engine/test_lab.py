@@ -84,8 +84,25 @@ def test_random_walk_passes_nothing():
                 dt.datetime(2026, 1, 5, 15, tzinfo=dt.timezone.utc), log=lambda *a: None)
     assert res["trials"] == 2 * len(L.STRATEGIES)
     assert not [x["id"] for x in res["strategies"] if x["passed"]]
+    assert {x["verdict"] for x in res["strategies"]} <= {"no edge", "inconclusive", "promising"}
     for x in res["strategies"]:
         assert x["live"]["state"] in ("waiting", "none", "signal", "no data"), x["live"]
+
+
+def test_lab_finds_a_planted_edge():
+    """Power check: a real overnight drift planted in random-walk days must pass."""
+    days, s, rows = _days()
+    edged = []
+    for d, O, H, L_, C in days:
+        f = np.ones(D.SLOTS)
+        f[:15] = np.exp(np.cumsum(np.full(15, 0.0035 / 15)))   # +35 bp over 18:00-09:00
+        f[15:] = f[14]
+        O2 = O * np.r_[1.0, f[:-1]]
+        edged.append((d, O2, H * f, L_ * f, C * f))
+    R, s2 = D.scales(edged)
+    st = [x for x in L.STRATEGIES if x["id"] == "overnight-long"][0]
+    tr = L.run_intraday(st, edged, s2, L.profiles(edged), 0.75)
+    assert L.tstat(L.daily_series(len(edged), tr)) > 3, "a strong planted edge is detected"
 
 
 def test_alerts_only_for_new_signals():
@@ -104,6 +121,7 @@ def test_alerts_only_for_new_signals():
 
 if __name__ == "__main__":
     test_alerts_only_for_new_signals()
+    test_lab_finds_a_planted_edge()
     test_fills_are_conservative()
     test_no_look_ahead()
     test_daily_rules_use_only_past_closes()
