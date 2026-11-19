@@ -46,6 +46,10 @@ CHANGES = [
                    "2.4 years of futures bars, which could only detect an edge with an annual Sharpe near 2."],
     ["2026-11-19", "The deflated Sharpe ratio is reported but no longer required: on top of the Bonferroni bar it "
                    "counted the multiple testing twice (an effective t of about 3.6)."],
+    ["2026-11-20", "Registered a quant library of seven intraday rules (opening-range breakout, the same on active "
+                   "days, intraday momentum after Gao et al., mean reversion, volatility channel breakout, 60-day "
+                   "trend in the day session, and a walk-forward logistic-regression model) and an equal-risk "
+                   "ensemble of the intraday rules (40 rule tests plus the ensemble)."],
     ["2026-11-20", "Fitted to MyFundedFutures 50K Builder: every intraday rule is flat at the 16:00 bar close (the "
                    "account is flattened at 16:10); rules that hold overnight are research only. Registered two "
                    "account-safe day-session versions of the daily trend filter and turn of the month (26 tests)."],
@@ -161,6 +165,170 @@ def i_month_turn_day(day, s, w, ctx=None):
     return 0, 1, day[1][0] * math.exp(-rem), None, D.LAST
 
 
+# ---------- quant library, registered 2026-11-20 ----------
+# All flat at the 16:00 bar close; stops scale with the expected remaining range, so size scales with volatility.
+
+def q_orb(day, s, w, ctx=None, pace_min=None):
+    """Opening-range breakout: the 09:00-10:00 bar's high and low are the range. From 10:00 to 15:00, a stop order
+    above the high buys and one below the low sells (whichever trades first; a bar that crosses both is skipped).
+    Stop at the middle of the range, flat at 16:00."""
+    k0 = slot(10)
+    _, O, H, L, C = day
+    hi, lo = H[k0 - 1], L[k0 - 1]
+    if not hi > lo:
+        return None
+    if pace_min is not None:
+        _, _, _, _, dhi, dlo, rem, done = _ctx(day, k0, s, w)
+        if math.log(dhi / dlo) / done < pace_min:
+            return None
+    mid = (hi + lo) / 2
+    for j in range(k0, slot(15) + 1):
+        up, dn = H[j] > hi, L[j] < lo
+        if up and dn:
+            return None
+        if up:
+            return j, 1, mid, None, D.LAST, hi
+        if dn:
+            return j, -1, mid, None, D.LAST, lo
+    return None
+
+
+def q_orb_active(day, s, w, ctx=None):
+    """Opening-range breakout on active days only: as the opening-range breakout, but only when the day's range by
+    10:00 is at least its usual pace (1.0x what the volatility profile expects by then)."""
+    return q_orb(day, s, w, ctx, pace_min=1.0)
+
+
+def q_intraday_momentum(day, s, w, ctx=None):
+    """Intraday momentum (Gao, Han, Li and Zhou, 2018): the return from the prior day's 16:00 close to 10:00 sets
+    the direction for the last hour; long or short at the 15:00 open, flat at 16:00. Stop half the remaining range
+    away. Needs the prior day's close."""
+    if not ctx or not ctx.get("prevClose"):
+        return None
+    k = slot(15)
+    _, O, H, L, C = day
+    m = math.log(C[slot(10) - 1] / ctx["prevClose"])
+    if m == 0:
+        return None
+    d = 1 if m > 0 else -1
+    rem = math.sqrt(max(1e-9, w[k:D.LAST + 1].sum())) * s
+    return k, d, O[k] * math.exp(-d * 0.5 * rem), None, D.LAST
+
+
+def q_mean_reversion(day, s, w, ctx=None):
+    """Mean reversion: from 10:00 to 14:00, when the last hourly close is more than 1.5 volatility units from the
+    average of the six closes before it (units: the volatility those six hours normally carry), fade it. Target the
+    average, stop one more unit away, flat at 16:00."""
+    _, O, H, L, C = day
+    for k in range(slot(10), slot(14) + 1):
+        mean = float(np.mean(C[k - 7:k - 1]))
+        unit = math.sqrt(max(1e-9, w[k - 7:k - 1].sum())) * s
+        z = math.log(C[k - 1] / mean) / unit
+        if abs(z) >= 1.5:
+            d = -1 if z > 0 else 1
+            e = O[k]
+            stop = e * math.exp(-d * unit)
+            return k, d, stop, mean, D.LAST
+    return None
+
+
+def q_channel_breakout(day, s, w, ctx=None):
+    """Volatility channel breakout: from 03:00 to 14:00, when an hourly close breaks above the highest high (or below
+    the lowest low) of the eight hours before it, follow it from the next open. Stop at the middle of that channel,
+    flat at 16:00."""
+    _, O, H, L, C = day
+    for k in range(slot(3), slot(14) + 1):
+        hh, ll = H[k - 9:k - 1].max(), L[k - 9:k - 1].min()
+        if C[k - 1] > hh:
+            return k, 1, (hh + ll) / 2, None, D.LAST
+        if C[k - 1] < ll:
+            return k, -1, (hh + ll) / 2, None, D.LAST
+    return None
+
+
+def q_trend_session(day, s, w, ctx=None):
+    """Trend, day session (time-series momentum): the sign of the last 60 daily closes' return sets the direction;
+    long or short at the 10:00 open, flat at 16:00. Stop half the remaining range away."""
+    if not ctx or not ctx.get("mom60"):
+        return None
+    k = slot(10)
+    d = ctx["mom60"]
+    rem = math.sqrt(max(1e-9, w[k:D.LAST + 1].sum())) * s
+    return k, d, day[1][k] * math.exp(-d * 0.5 * rem), None, D.LAST
+
+
+def q_model(day, s, w, ctx=None):
+    """Model (walk-forward logistic regression): six volatility-scaled features known at 10:00 (prior close to
+    10:00, the 09:00 hour, the prior day, today's pace, where price sits in today's range, the prior day's range)
+    predict whether 10:00-16:00 closes up. L2-regularised, refit every January on earlier years only. Long above
+    53%, short below 47%, at the 10:00 open; stop half the remaining range away, flat at 16:00."""
+    if not ctx or ctx.get("pUp") is None:
+        return None
+    p = ctx["pUp"]
+    if 0.47 <= p <= 0.53:
+        return None
+    d = 1 if p > 0.53 else -1
+    k = slot(10)
+    rem = math.sqrt(max(1e-9, w[k:D.LAST + 1].sum())) * s
+    return k, d, day[1][k] * math.exp(-d * 0.5 * rem), None, D.LAST
+
+
+def _logit(X, y, lam=2.0, iters=40):
+    """L2-regularised logistic regression by Newton steps (the intercept is not penalised)."""
+    Xb = np.c_[np.ones(len(X)), X]
+    b = np.zeros(Xb.shape[1])
+    P = np.eye(Xb.shape[1]) * lam
+    P[0, 0] = 0
+    for _ in range(iters):
+        p = 1 / (1 + np.exp(-Xb @ b))
+        g = Xb.T @ (p - y) + P @ b
+        Hm = (Xb * (p * (1 - p))[:, None]).T @ Xb + P
+        step = np.linalg.solve(Hm, g)
+        b -= step
+        if np.abs(step).max() < 1e-8:
+            break
+    return b
+
+
+def model_features(days, s, w):
+    """Features at 10:00 for each day (None where not available) and the 10:00-16:00 outcome."""
+    k = slot(10)
+    F, Y = [], []
+    for i, (d, O, H, L, C) in enumerate(days):
+        if i == 0 or s[i] is None or w[i] is None or (d - days[i - 1][0]).days > 4:
+            F.append(None)
+            Y.append(None)
+            continue
+        pO, pH, pL, pC = days[i - 1][1:]
+        prev = pC[D.LAST]
+        hi, lo = H[:k].max(), L[:k].min()
+        done = math.sqrt(max(1e-9, w[i][:k].sum())) * s[i]
+        F.append([math.log(C[k - 1] / prev) / s[i], math.log(C[k - 1] / O[k - 1]) / s[i],
+                  math.log(prev / pO[0]) / s[i], math.log(hi / lo) / done, (C[k - 1] - lo) / max(1e-9, hi - lo) - 0.5,
+                  math.log(pH.max() / pL.min()) / s[i]])
+        Y.append(1.0 if C[D.LAST] > O[k] else 0.0)
+    return F, Y
+
+
+def model_predictions(days, s, w, min_train=250):
+    """Walk-forward P(up) per day: refit each January on all earlier days with features."""
+    F, Y = model_features(days, s, w)
+    out = [None] * len(days)
+    years = sorted({d[0].year for d in days})
+    for yr in years:
+        tr = [i for i, d in enumerate(days) if d[0].year < yr and F[i] is not None]
+        te = [i for i, d in enumerate(days) if d[0].year == yr and F[i] is not None]
+        if len(tr) < min_train or not te:
+            continue
+        X = np.array([F[i] for i in tr])
+        mu, sd = X.mean(0), X.std(0) + 1e-9
+        b = _logit((X - mu) / sd, np.array([Y[i] for i in tr]))
+        for i in te:
+            x = (np.array(F[i]) - mu) / sd
+            out[i] = float(1 / (1 + math.exp(-(b[0] + x @ b[1:]))))
+    return out, F
+
+
 # ---------- daily strategies (close to close) ----------
 # Each returns a position for the NEXT day from closes up to today: array of -1, 0, 1.
 
@@ -234,6 +402,20 @@ STRATEGIES = [
      "registered": "2026-11-20"},
     {"id": "month-turn-day", "name": "Turn of the month, day session", "kind": "intraday", "fn": i_month_turn_day,
      "daily": True, "registered": "2026-11-20"},
+    {"id": "orb", "name": "Opening-range breakout", "kind": "intraday", "fn": q_orb, "daily": True,
+     "registered": "2026-11-20", "family": "quant"},
+    {"id": "orb-active", "name": "Opening-range breakout, active days", "kind": "intraday", "fn": q_orb_active,
+     "daily": True, "registered": "2026-11-20", "family": "quant"},
+    {"id": "intraday-momentum", "name": "Intraday momentum (Gao et al.)", "kind": "intraday",
+     "fn": q_intraday_momentum, "daily": True, "registered": "2026-11-20", "family": "quant"},
+    {"id": "mean-reversion", "name": "Mean reversion", "kind": "intraday", "fn": q_mean_reversion, "daily": True,
+     "registered": "2026-11-20", "family": "quant"},
+    {"id": "channel-breakout", "name": "Volatility channel breakout", "kind": "intraday", "fn": q_channel_breakout,
+     "daily": True, "registered": "2026-11-20", "family": "quant"},
+    {"id": "trend-session", "name": "Trend, day session (60-day)", "kind": "intraday", "fn": q_trend_session,
+     "daily": True, "registered": "2026-11-20", "family": "quant"},
+    {"id": "model", "name": "Model: walk-forward logistic regression", "kind": "intraday", "fn": q_model,
+     "daily": True, "registered": "2026-11-20", "family": "quant"},
     {"id": "momentum-20", "name": "20-day momentum", "kind": "daily", "fn": d_momentum},
     {"id": "dip", "name": "Buy the big down day", "kind": "daily", "fn": d_dip},
     {"id": "trend-200", "name": "200-day trend filter", "kind": "daily", "fn": d_trend200},
@@ -250,17 +432,35 @@ for _s in STRATEGIES:
 def simulate(day, plan):
     """Walk an intraday plan through the day's bars. Returns (entry, exit, reason, bars held)."""
     _, O, H, L, C = day
-    k, d, stop, target, last = plan
-    e = O[k]
-    for j in range(k, last + 1):
+    k, d, stop, target, last = plan[:5]
+    trigger = plan[5] if len(plan) > 5 else None
+    if trigger is not None:
+        # A resting stop order, filled at the level (or the open if the bar gapped through it). Inside the entry bar
+        # the order of the high and low is unknown, so the standard path rule decides it: a bar that opened nearer
+        # its high went up first (open, high, low, close), otherwise down first (open, low, high, close). The stop
+        # counts if the path reaches it after the fill, or if the bar closes beyond it.
+        e = max(trigger, O[k]) if d > 0 else min(trigger, O[k])
+        up_first = (H[k] - O[k]) <= (O[k] - L[k])
+        if d > 0:
+            hit = (up_first and L[k] <= stop) or C[k] <= stop
+        else:
+            hit = ((not up_first) and H[k] >= stop) or C[k] >= stop
+        if hit:
+            return e, stop, "stop", 1
+        if k == last:
+            return e, C[last], "time", 1
+        k0 = k + 1
+    else:
+        e, k0 = O[k], k
+    for j in range(k0, last + 1):
         if d > 0:
             if L[j] <= stop:
-                return e, min(stop, O[j]) if j > k else stop, "stop", j - k + 1
+                return e, min(stop, O[j]) if j > k0 or trigger is not None else stop, "stop", j - k + 1
             if target is not None and H[j] >= target:
                 return e, target, "target", j - k + 1
         else:
             if H[j] >= stop:
-                return e, max(stop, O[j]) if j > k else stop, "stop", j - k + 1
+                return e, max(stop, O[j]) if j > k0 or trigger is not None else stop, "stop", j - k + 1
             if target is not None and L[j] <= target:
                 return e, target, "target", j - k + 1
     return e, C[last], "time", last - k + 1
@@ -297,7 +497,21 @@ def daily_context(days, daily_dates, daily_c):
             out.append(None)
             continue
         sma = (cs[j + 1] - cs[j - 199]) / 200
-        out.append({"above200": bool(daily_c[j] > sma), "monthDay": rank.get(d)})
+        mom = float(np.sign(math.log(daily_c[j] / daily_c[j - 60])))
+        out.append({"above200": bool(daily_c[j] > sma), "monthDay": rank.get(d), "mom60": int(mom) or None})
+    return out
+
+
+def intraday_context(days, s, w, ctx):
+    """Add what needs the hourly days themselves: the prior day's 16:00 close and the model's P(up)."""
+    preds, _ = model_predictions(days, s, w)
+    out = []
+    for i, c in enumerate(ctx):
+        c = dict(c or {})
+        if i > 0 and (days[i][0] - days[i - 1][0]).days <= 4:
+            c["prevClose"] = float(days[i - 1][4][D.LAST])
+        c["pUp"] = preds[i]
+        out.append(c)
     return out
 
 
@@ -311,6 +525,8 @@ def run_intraday(st, days, s, w, cost, ctx=None):
             continue
         e, x, why, held = simulate(day, plan)
         d = plan[1]
+        if abs(e - plan[2]) <= 0:
+            continue
         net = d * (x - e) - cost
         trades.append({"i": i, "date": str(day[0]), "dir": d, "entry": e, "exit": x, "why": why, "bars": held,
                        "slot": plan[0], "risk": abs(e - plan[2]), "net": net, "bp": net / e * 1e4, "plan": plan})
@@ -322,7 +538,7 @@ def random_intraday(trades, days, s, w, cost, rnd):
     out = []
     usable = [i for i in range(len(days)) if s[i] is not None and w[i] is not None]
     for t in trades:
-        k, d, stop, target, last = t["plan"]
+        k, d, stop, target, last = t["plan"][:5]
         span = last - k
         i = rnd.choice(usable)
         k2 = rnd.randrange(0, D.LAST + 1 - span)
@@ -469,9 +685,9 @@ def live_intraday(st, rows1, s_today, w, now, ctx_today=None):
             plan = st["fn"](fill, s_today, w, ctx_today) if st.get("daily") else st["fn"](fill, s_today, w)
         except (ValueError, ZeroDivisionError):
             plan = None
-    if plan and plan[0] <= done:
-        k, d, stop, target, end = plan
-        entry = O[k] if k < done else C[done - 1]
+    if plan and plan[0] <= done and not (len(plan) > 5 and plan[0] >= done):
+        k, d, stop, target, end = plan[:5]
+        entry = plan[5] if len(plan) > 5 else (O[k] if k < done else C[done - 1])
         return {"state": "signal", "dir": "LONG" if d > 0 else "SHORT", "entry": round(float(entry), 2),
                 "stop": round(float(stop), 2), "target": round(float(target), 2) if target is not None else None,
                 "at": "%02d:00" % D.SLOT_HOURS[k], "exitBy": "%02d:00 New York" % ((D.SLOT_HOURS[end] + 1) % 24)}
@@ -480,8 +696,41 @@ def live_intraday(st, rows1, s_today, w, now, ctx_today=None):
     return {"state": "waiting", "note": "Decides by %02d:00 New York." % D.SLOT_HOURS[last]}
 
 
+def live_model(days, s, w, rows1, now, prev):
+    """Today's P(up) from a model fitted on every completed day, once the 09:00 hour has closed."""
+    try:
+        preds, F = model_predictions(days, s, w)
+        key, done, a = partial_day(rows1, now)
+        k = slot(10)
+        if done < k or not prev:
+            return None
+        fit = [i for i in range(len(days)) if F[i] is not None]
+        if len(fit) < 250:
+            return None
+        _, Y = model_features(days, s, w)
+        X = np.array([F[i] for i in fit])
+        mu, sd = X.mean(0), X.std(0) + 1e-9
+        b = _logit((X - mu) / sd, np.array([Y[i] for i in fit]))
+        O, H, L, C = (a[:, j] for j in range(4))
+        sc = s[-1]
+        acc = np.zeros(D.SLOTS)
+        for _, _, Hh, Ll, _ in days:
+            acc += np.log(Hh / Ll) ** 2
+        wt = acc / acc.sum()
+        hi, lo = H[:k].max(), L[:k].min()
+        doneu = math.sqrt(max(1e-9, wt[:k].sum())) * sc
+        pO, pH, pL, pC = days[-1][1:]
+        f = [math.log(C[k - 1] / prev) / sc, math.log(C[k - 1] / O[k - 1]) / sc, math.log(prev / pO[0]) / sc,
+             math.log(hi / lo) / doneu, (C[k - 1] - lo) / max(1e-9, hi - lo) - 0.5, math.log(pH.max() / pL.min()) / sc]
+        x = (np.array(f) - mu) / sd
+        return float(1 / (1 + math.exp(-(b[0] + x @ b[1:]))))
+    except Exception:
+        return None
+
+
 def _decision_slot(st):
-    return {"exhaustion": slot(14), "opening-drive": slot(10), "overnight-fade": slot(9), "overnight-long": 0,
+    return {"orb": slot(15), "orb-active": slot(15), "intraday-momentum": slot(15), "mean-reversion": slot(14),
+            "channel-breakout": slot(14), "trend-session": slot(10), "model": slot(10),"exhaustion": slot(14), "opening-drive": slot(10), "overnight-fade": slot(9), "overnight-long": 0,
             "late-momentum": slot(15), "fast-trend": slot(12), "trend-day": 0, "month-turn-day": 0}[st["id"]]
 
 
@@ -602,6 +851,25 @@ def account_eval(m, trades, n_days, cost):
     return A.evaluations(pts.tolist(), stops, pv_micro)
 
 
+def ensemble_tests(tests):
+    """Per market, every intraday rule the account allows, combined at equal risk (each scaled to the same
+    volatility on the days it trades), as one strategy. Its random benchmark combines the members' random runs."""
+    out = []
+    for m in D.MARKETS:
+        mem = [t for t in tests if t["m"] == m and t["st"]["kind"] == "intraday" and t["trades"]]
+        if len(mem) < 2:
+            continue
+        n = len(mem[0]["r"])
+        scale = [1 / (np.std(t["r"][t["r"] != 0]) or 1) for t in mem]
+        r = sum(sc * t["r"] for sc, t in zip(scale, mem)) / len(mem)
+        k = min(len(t["rnd"]) for t in mem)
+        rnd = [sum(sc * t["rnd"][j] for sc, t in zip(scale, mem)) / len(mem) for j in range(k)]
+        unit = np.std(mem[0]["r"][mem[0]["r"] != 0]) or 1   # express in the first member's bp for readability
+        out.append({"m": m, "members": [t["st"]["id"] for t in mem], "r": r * unit, "rnd": [x * unit for x in rnd],
+                    "dates": mem[0]["dates"]})
+    return out
+
+
 def run(intraday_data, daily_data, now, log=print, seed=7):
     """intraday_data: {market: (days, s, rows1)}; daily_data: {market: {date: [o,h,l,c]}}."""
     rnd = random.Random(seed)
@@ -624,11 +892,14 @@ def run(intraday_data, daily_data, now, log=print, seed=7):
             if dd[0] and m == "gold":   # Yahoo's daily gold candles before 2013 are placeholders
                 keep = [i for i, d in enumerate(dd[0]) if d >= "2013-01-01"]
                 dd = ([dd[0][i] for i in keep], dd[1][keep])
-            ctx = daily_context(days, *dd)
+            ctx = intraday_context(days, s, w, daily_context(days, *dd))
             ctx_today = None
             if dd[0]:
                 key = str(D.day_key(now.astimezone(D.NY)))
-                ctx_today = daily_context([(dt.date.fromisoformat(key),)], *dd)[0]
+                ctx_today = dict(daily_context([(dt.date.fromisoformat(key),)], *dd)[0] or {})
+                if days and str(days[-1][0]) < key:
+                    ctx_today["prevClose"] = float(days[-1][4][D.LAST])
+                ctx_today["pUp"] = live_model(days, s, w, rows1, now, ctx_today.get("prevClose"))
             for st in [x for x in STRATEGIES if x["kind"] == "intraday"]:
                 trades = run_intraday(st, days, s, w, cost, ctx)
                 r = daily_series(len(days), trades)
@@ -652,7 +923,8 @@ def run(intraday_data, daily_data, now, log=print, seed=7):
                 tests.append({"m": m, "st": st, "r": r, "trades": trades, "rnd": rr, "dates": dates, "pv": pv,
                               "live": live_daily(st, p, dates, c), "last": float(c[-1]),
                               "range": float(np.mean(np.abs(np.diff(np.log(c[-21:]))))) * float(c[-1])})
-    n_trials = len(STRATEGIES) * len(D.MARKETS)
+    ensembles = ensemble_tests(tests)
+    n_trials = len(STRATEGIES) * len(D.MARKETS) + len(ensembles)
     bar = ND.inv_cdf(1 - 0.05 / n_trials)
     out = []
     for t in tests:
@@ -667,8 +939,14 @@ def run(intraday_data, daily_data, now, log=print, seed=7):
                     "market": t["m"], **ev, **sm, "live": t["live"],
                     "recentTrades": [{k: (round(v, 2) if isinstance(v, float) else v) for k, v in x.items()
                                       if k in ("date", "dir", "entry", "exit", "why", "net")} for x in t["trades"][-8:]]})
+    ens_out = []
+    for e in ensembles:
+        ev = evaluate(e["r"], [None] * 1000, "intraday", e["rnd"], n_trials, bar)
+        ens_out.append({"market": e["m"], "members": e["members"], "days": len(e["r"]), **ev,
+                        "curve": curve(e["dates"], e["r"])})
     passed = [f"{x['market']}:{x['id']}" for x in out if x["passed"]]
     cands = [f"{x['market']}:{x['id']}" for x in out if x["tier"] == "candidate"]
     log(f"lab: {len(out)} tests, bar t >= {bar:.2f}; passed {passed or 'none'}; candidates {cands or 'none'}")
     return {"registered": REGISTERED, "trials": n_trials, "account": A.ACCOUNT, "bar": round(bar, 2), "random": N_RANDOM,
-            "costs": COST, "changes": CHANGES, "meaningful": MEANINGFUL_SHARPE, "strategies": out}
+            "costs": COST, "changes": CHANGES, "meaningful": MEANINGFUL_SHARPE, "strategies": out,
+            "ensembles": ens_out}
