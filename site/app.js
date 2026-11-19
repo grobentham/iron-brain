@@ -82,7 +82,7 @@
     if (manual[m] > 0) return { p: manual[m], src: "typed" };
     if (q && Date.now() - q.at < 120e3) return { p: q.price, src: "Live Bridge · " + q.symbol };
     var age = (Date.now() - new Date(v.today.lastTime).getTime()) / 60e3;
-    return { p: v.today.last, src: "last bar " + v.today.lastTime.slice(11, 16) + " NY", stale: age > 40 && !closed(ny(new Date())), age: age };
+    return { p: v.today.last, src: "last bar " + v.today.lastTime.slice(11, 16) + " NY", stale: age > 40 && sessionOpen(), age: age };
   }
 
   /* ---- rendering ---- */
@@ -92,7 +92,7 @@
       return '<button role="tab" aria-selected="' + (m === cur) + '" data-m="' + m + '">' + esc(v.name) + "<small>" + esc(v.full) + "</small></button>";
     }).join("");
     Array.prototype.forEach.call($("tabs").querySelectorAll("button"), function (b) {
-      b.onclick = function () { cur = b.getAttribute("data-m"); store.set("ib-market", cur); tabs(); desk(true); ctx(); labView(); testsView(); };
+      b.onclick = function () { cur = b.getAttribute("data-m"); store.set("ib-market", cur); tabs(); desk(true); ctx(); labView(); testsView(); chrome_(); };
     });
   }
 
@@ -101,12 +101,17 @@
     var P = priceOf(cur), S = state(v, P.p, new Date());
     if (rebuild || !$("ib-price")) {
       $("desk-body").innerHTML =
-        '<div class="now"><label class="px"><small>Price</small><input id="ib-price" inputmode="decimal" autocomplete="off"></label>' +
+        '<div class="desk"><div class="main-col">' +
+        '<div class="now"><label class="px"><small>' + esc(v.name) + ' price</small><input id="ib-price" inputmode="decimal" autocomplete="off" aria-label="Price"></label>' +
         '<div class="px-src" id="ib-src"></div><button type="button" id="ib-reset" class="link">Use the latest bar</button></div>' +
-        '<div id="ib-live"></div>' +
-        '<div class="grid2"><div class="card"><h3>Touch before the 16:10 flat</h3><div id="ib-ladder"></div>' +
-        '<div class="custom"><label>Check a level <input id="ib-level" inputmode="decimal" placeholder="e.g. a stop or target"></label><div id="ib-level-out"></div></div></div>' +
-        '<div class="card"><h3>Volatility through the day</h3><div id="ib-profile"></div><p class="fine">Share of a typical day’s movement in each hour (New York time). The highlighted bar is now.</p></div></div>';
+        '<div id="ib-closed"></div>' +
+        '<div class="card ladder-card"><h3>Chance of trading each level before the 16:10 flat</h3><div id="ib-ladder"></div></div>' +
+        '</div><div class="side">' +
+        '<div class="facts" id="ib-live"></div>' +
+        '<div class="check"><label for="ib-level">Check a level, such as your stop or target<input id="ib-level" inputmode="decimal" placeholder="Type a price"></label><div id="ib-level-out"></div></div>' +
+        '<div id="ib-sig"></div>' +
+        '<h3>Today’s context from Displace</h3><div id="ctx"><p class="muted">Loading Displace’s daily bias…</p></div>' +
+        '</div></div>';
       $("ib-price").onchange = $("ib-price").oninput = function () {
         var x = Number(String($("ib-price").value).replace(/,/g, ""));
         manual[cur] = x > 0 ? x : 0; desk(false);
@@ -117,32 +122,30 @@
     if (document.activeElement !== $("ib-price")) $("ib-price").value = fmt(P.p, v).replace(/,/g, "");
     $("ib-src").innerHTML = esc(P.src) + (P.stale ? ' <b class="warn">· ' + Math.round(P.age) + " min old: type the live price</b>" : "");
 
+    $("ib-sig").innerHTML = sigLine();
     if (S.closed) {
-      $("ib-live").innerHTML = '<div class="closed">' + (S.flat ? "Your account is flat: MyFundedFutures closes positions at 16:10 New York. Trading reopens at 18:00." : "Futures are closed. The day reopens at 18:00 New York time; odds resume then.") + "</div>";
-      $("ib-ladder").innerHTML = ""; $("ib-level-out").innerHTML = "";
-      $("ib-profile").innerHTML = profileSvg(v, -1);
+      $("ib-closed").innerHTML = '<div class="closed">' + (S.flat ? "Your account is flat: MyFundedFutures closes every position at 16:10 New York. The next session opens at 18:00." : "Futures are closed. The next session opens at 18:00 New York time.") + "</div>";
+      $("ib-live").innerHTML = ""; $("ib-ladder").innerHTML = '<p class="muted" style="padding:0 18px">The ladder returns when the session opens.</p>'; $("ib-level-out").innerHTML = "";
       return;
     }
+    $("ib-closed").innerHTML = "";
     var remPts = S.price * S.sig, upMed = inverse(S.up, v.grid, 0.5) * S.adj * remPts, dnMed = inverse(S.dn, v.grid, 0.5) * S.adj * remPts;
     var pHi = S.sameDay ? pTouch(v, S, S.hi + v.tick) : null, pLo = S.sameDay ? pTouch(v, S, S.lo - v.tick) : null;
     var pace = S.rho > 1.15 ? "faster than usual" : S.rho < 0.87 ? "slower than usual" : "about usual";
     $("ib-live").innerHTML =
       '<div class="stats">' +
-      stat("Day done", Math.round(S.done * 100) + "%", "of a typical day’s movement by " + pad(S.n.h) + ":" + pad(S.n.m) + " NY") +
-      stat("Remaining range", pts(roundTick(remPts, v), v) + " pts", "typical, before pace") +
-      stat("Pace", (S.sameDay ? S.rho.toFixed(2) + "×" : "—"), S.sameDay ? "today’s range so far is " + pace + (v.beta ? "" : " (not used)") : "no bars yet for today") +
-      stat("Even odds", "+" + pts(roundTick(upMed, v), v) + " / −" + pts(roundTick(dnMed, v), v), "points above / below that are reached on half of days") +
-      "</div>" +
-      (S.sameDay ? '<div class="stats two">' +
-        stat("New high today", pc(pHi), "above " + fmt(S.hi, v) + " before 16:10") +
-        stat("New low today", pc(pLo), "below " + fmt(S.lo, v) + " before 16:10") + "</div>" : "");
+      (S.sameDay ? stat("New high today", pc(pHi), "above " + fmt(S.hi, v) + " before 16:10") +
+        stat("New low today", pc(pLo), "below " + fmt(S.lo, v) + " before 16:10") : "") +
+      stat("Reached on half of days", "+" + pts(roundTick(upMed, v), v) + " / −" + pts(roundTick(dnMed, v), v), "points above and below the price") +
+      stat("Pace", (S.sameDay ? S.rho.toFixed(2) + "×" : "—"), S.sameDay ? "today is moving " + pace + (v.beta ? "" : " (not used)") : "no bars yet for today") +
+      "</div>";
 
     var rows = [], ks = [1, 0.75, 0.5, 0.25];
     ks.forEach(function (k) { rows.push(row("+" + frac(k), S.price * Math.exp(k * S.sig), v, S, "up")); });
-    rows.push('<tr class="mid"><td>Price</td><td class="n">' + fmt(S.price, v) + '</td><td></td><td></td></tr>');
+    rows.push('<tr class="mid"><td>Now</td><td class="n lv">' + fmt(S.price, v) + '</td><td></td><td></td></tr>');
     ks.slice().reverse().forEach(function (k) { rows.push(row("−" + frac(k), S.price * Math.exp(-k * S.sig), v, S, "dn")); });
     $("ib-ladder").innerHTML = '<table class="ladder"><thead><tr><th>Step</th><th class="n">Level</th><th class="n">Away</th><th>Chance</th></tr></thead><tbody>' + rows.join("") + "</tbody></table>" +
-      '<p class="fine">Steps are fractions of the remaining range. The chance a price is traded before the 16:10 flat, from walk-forward tests since ' + esc(v.tests.from) + ".</p>";
+      '<p class="fine" style="padding:0 18px">Steps are fractions of the ' + pts(roundTick(remPts, v), v) + "-point range typically still to come. Odds from walk-forward tests since " + esc(v.tests.from) + ".</p>";
     var L = Number(String($("ib-level").value || "").replace(/,/g, ""));
     if (L > 0) {
       var p = pTouch(v, S, L), d = L - S.price;
@@ -150,14 +153,13 @@
       $("ib-level-out").innerHTML = "<b>" + pc(p) + "</b> chance of trading " + fmt(L, v) + " (" + (d >= 0 ? "+" : "−") + pts(Math.abs(d), v) + " pts) before 16:10. " +
         (room ? "As a stop, each micro risks " + usd(perMicro) + ": <b>" + fit + "</b> micro" + (fit === 1 ? "" : "s") + " fit your risk and loss limits" + (fit >= 10 ? " (" + Math.floor(fit / 10) + " mini" + (fit >= 20 ? "s" : "") + ")" : "") + "." : "");
     } else $("ib-level-out").innerHTML = "";
-    $("ib-profile").innerHTML = profileSvg(v, (S.n.h - 18 + 24) % 24);
   }
   function frac(k) { return k === 1 ? "1" : k === 0.75 ? "¾" : k === 0.5 ? "½" : "¼"; }
   function pad(x) { return (x < 10 ? "0" : "") + x; }
   function stat(t, b, s) { return '<div class="stat"><small>' + esc(t) + "</small><b>" + b + "</b><span>" + esc(s) + "</span></div>"; }
   function row(lab, level, v, S, side) {
     var L = roundTick(level, v), p = pTouch(v, S, L);
-    return '<tr><td>' + lab + '</td><td class="n">' + fmt(L, v) + '</td><td class="n">' + (side === "up" ? "+" : "−") + pts(Math.abs(L - S.price), v) +
+    return '<tr><td>' + lab + '</td><td class="n lv">' + fmt(L, v) + '</td><td class="n">' + (side === "up" ? "+" : "−") + pts(Math.abs(L - S.price), v) +
       '</td><td class="bar ' + side + '"><i style="width:' + Math.round((p || 0) * 100) + '%"></i><span>' + pc(p) + "</span></td></tr>";
   }
   function profileSvg(v, now) {
@@ -168,6 +170,70 @@
     }).join("");
     var labs = v.hours.map(function (h, i) { return i % 3 === 0 ? '<text x="' + (i * bw + bw / 2).toFixed(1) + '" y="' + (H - 3) + '">' + pad(h) + "</text>" : ""; }).join("");
     return '<svg class="prof" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Volatility by hour">' + bars + labs + "</svg>";
+  }
+
+  /* ---- top bar and the session strip ---- */
+  function sessionOpen() { var n = ny(new Date()), v = D.markets[cur]; return !closed(n) && ((n.h - 18 + 24) % 24) <= v.last; }
+  function sessionInfo() {
+    var n = ny(new Date()), v = D.markets[cur];
+    if (closed(n) || ((n.h - 18 + 24) % 24) > v.last) {
+      var flatNow = !closed(n);
+      return { open: false, n: n, msg: flatNow ? "Flat for the day" : "Market closed", toOpen: true };
+    }
+    var mins = ((16 * 60 + 10) - (n.h * 60 + n.m) + 1440) % 1440;
+    return { open: true, n: n, mins: mins };
+  }
+  function chrome_() {
+    if (!D) return;
+    var I = sessionInfo(), v = D.markets[cur];
+    $("clock").innerHTML = I.open ? '<span class="live"></span><b>' + pad(I.n.h) + ":" + pad(I.n.m) + '</b> <span class="rest">New York · </span>' + Math.floor(I.mins / 60) + "h" + pad(I.mins % 60) + " to flat"
+      : '<span class="live shut"></span><b>' + pad(I.n.h) + ":" + pad(I.n.m) + '</b> <span class="rest">New York · </span>' + I.msg + ", opens 18:00";
+    var R = acctRoom();
+    if (R) { $("room").innerHTML = "Room <b>" + usd(R.mll) + "</b> · today <b>" + usd(R.dll) + "</b>"; $("room").className = "room" + (R.mll < 600 || R.dll < 300 ? " low" : ""); }
+    strip(v, I);
+  }
+  function strip(v, I) {
+    var w = v.profile, last = v.last, W = Math.max(300, Math.round(($("strip").clientWidth || 1140))), H = 78, base = 52, n = w.length, bw = W / n, mx = Math.max.apply(null, w);
+    var j = (I.n.h - 18 + 24) % 24, frac = I.n.m / 60, done = 0, rem = 0;
+    for (var k = 0; k <= last; k++) { var share = w[k]; if (!I.open) { if (k <= last) done += share; continue; } if (k < j) done += share; else if (k === j) { done += share * frac; rem += share * (1 - frac); } else rem += share; }
+    var tot = 0; for (k = 0; k <= last; k++) tot += w[k];
+    var bars = w.map(function (x, i) {
+      var h = Math.max(2, (x / mx) * (base - 8)), y = base - h, x0 = i * bw + 1.5, wd = bw - 3, out = "";
+      if (i > last) return '<rect class="after" x="' + x0.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + wd.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2"/>';
+      if (!I.open || i < j) return '<rect class="done" x="' + x0.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + wd.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2"/>';
+      if (i > j) return '<rect class="left" x="' + x0.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + wd.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2"/>';
+      out += '<rect class="left" x="' + x0.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + wd.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2"/>';
+      out += '<rect class="done" x="' + x0.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + (wd * frac).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2"/>';
+      return out;
+    }).join("");
+    var cx = I.open ? (j + frac) * bw : null;
+    var every = W < 520 ? 6 : 3;
+    var labels = v.hours.map(function (h, i) { return (h % every === 0) ? '<text x="' + (i * bw + 2).toFixed(1) + '" y="' + (base + 16) + '">' + pad(h) + ":00</text>" : ""; }).join("");
+    var flatX = (last + 1) * bw + bw * (10 / 60);
+    var svg = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Share of a typical day’s movement by hour, New York time"><defs><pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="#26333f"/><line x1="0" y1="0" x2="0" y2="5" stroke="#3d4f61" stroke-width="2"/></pattern></defs>' + bars +
+      '<line x1="' + flatX.toFixed(1) + '" x2="' + flatX.toFixed(1) + '" y1="4" y2="' + base + '" stroke="#e9a20c" stroke-width="1" stroke-dasharray="3 3"/><text class="flat" x="' + (flatX - 4).toFixed(1) + '" y="12" text-anchor="end">16:10 flat</text>' +
+      (cx != null ? '<line class="curl" x1="' + cx.toFixed(1) + '" x2="' + cx.toFixed(1) + '" y1="0" y2="' + (base + 2) + '"/><circle class="cur" cx="' + cx.toFixed(1) + '" cy="' + (base + 2) + '" r="4"/>' : "") + labels + "</svg>";
+    $("strip").innerHTML = svg;
+    var P = priceOf(cur), S = state(v, P.p, new Date());
+    $("strip-say").innerHTML = I.open && !S.closed ?
+      '<b>' + Math.round(100 * done / tot) + "%</b> of a typical day’s movement is done. About <b class=\"amber\">" + pts(roundTick(P.p * S.sig, v), v) + " points</b> of " + esc(v.name) + " range is still to come before the flat." :
+      "The session strip shows how much of a typical day’s movement each hour carries. " + (I.msg === "Flat for the day" ? "Your account is flat until 18:00 New York." : "Futures reopen at 18:00 New York.");
+  }
+  function route() {
+    var h = (location.hash || "#desk").slice(1), views = document.querySelectorAll("[data-view]"), ok = false;
+    Array.prototype.forEach.call(views, function (el) { if (el.getAttribute("data-view") === h) ok = true; });
+    if (!ok) h = "desk";
+    Array.prototype.forEach.call(views, function (el) { el.hidden = el.getAttribute("data-view") !== h; });
+    Array.prototype.forEach.call(document.querySelectorAll(".views a"), function (a) { if (a.getAttribute("data-v") === h) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  }
+  window.addEventListener("hashchange", function () { route(); window.scrollTo(0, 0); });
+  var rz; window.addEventListener("resize", function () { clearTimeout(rz); rz = setTimeout(chrome_, 150); });
+  function sigLine() {
+    var Lb = D.lab; if (!Lb) return "";
+    var on = Lb.strategies.filter(function (x) { return x.tier === "tested" && x.market === cur && x.live && x.live.state === "signal"; });
+    var tested = Lb.strategies.filter(function (x) { return x.tier === "tested"; });
+    if (on.length) return '<p class="sigline on"><b>Tested signal:</b> ' + on.map(function (x) { return esc(x.name) + " " + esc(x.live.dir); }).join(", ") + '. <a href="#signals">Details</a></p>';
+    return '<p class="sigline">' + (tested.length ? "No tested signal right now for " + esc(D.markets[cur].name) + "." : "No strategy your account allows has passed testing yet, so there are no signals.") + ' <a href="#signals">Signals</a></p>';
   }
 
   /* ---- Displace context ---- */
@@ -206,24 +272,25 @@
       stat("Max loss", usd(A.mll[s.plan]), "trails your best end-of-day balance, locks at " + usd(A.start + A.lockAbove)) +
       stat("Daily loss", usd(A.dll), "soft pause: no more trading that day") +
       stat("Size and hours", A.maxMinis + " minis / " + A.maxMicros + " micros", "flat by " + A.flat + " New York, no overnight") + "</div>";
-    var form = '<div class="acct-form"><label>Plan <select id="ac-plan"><option value="default"' + (s.plan === "default" ? " selected" : "") + '>Default ($2,000 max loss)</option><option value="addon"' + (s.plan === "addon" ? " selected" : "") + ">Add-On ($1,500 max loss)</option></select></label>" +
+    var form = '<div class="acct-form"><label>Plan and max loss <select id="ac-plan"><option value="default"' + (s.plan === "default" ? " selected" : "") + '>Default, $2,000</option><option value="addon"' + (s.plan === "addon" ? " selected" : "") + ">Add-On, $1,500</option></select></label>" +
       '<label>Balance $<input id="ac-bal" inputmode="decimal" value="' + s.bal + '"></label>' +
       '<label>Best end-of-day balance $<input id="ac-peak" inputmode="decimal" value="' + s.peak + '"></label>' +
       '<label>Today’s P&amp;L $<input id="ac-today" inputmode="decimal" value="' + s.today + '"></label>' +
       '<label>Risk per trade $<input id="ac-risk" inputmode="decimal" value="' + s.risk + '"></label></div>';
     var warn = s.risk > R.dll ? '<p class="warn">Your risk per trade is more than what’s left of today’s daily loss limit.</p>' : s.risk > R.mll / 3 ? '<p class="warn">One loss at this size uses more than a third of your room to the max loss limit.</p>' : "";
-    var room = '<div class="stats">' +
-      stat("Room to max loss", usd(R.mll), "your account fails at " + usd(R.floor)) +
-      stat("Room today", usd(R.dll), "before the daily soft pause") +
-      stat("To the target", R.toTarget > 0 ? usd(R.toTarget) : "Reached", R.toTarget > 0 ? "of " + usd(A.target) : "request your sim funded account") +
-      stat("Losses you can take", R.mll > 0 ? Math.floor(R.mll / Math.max(1, s.risk)) : 0, "full stop-outs at " + usd(s.risk) + " before failing") + "</div>";
-    $("acct-body").innerHTML = '<p class="sub">Iron Brain is fitted to the <b>' + esc(A.name) + "</b>. Rules checked " + esc(A.checked) + ' from <a href="' + esc(A.source) + '">MyFundedFutures’ help center</a>; prop rules change, so confirm before trading. News trading is unrestricted on this plan.</p>' + rules + form + warn + room +
+    var gauge = function (cls, label, val, of_, note) { var f = Math.max(0, Math.min(1, of_ ? val / of_ : 0)); return '<div class="gauge ' + cls + '"><small>' + label + "</small><b>" + usd(val) + '</b><div class="track"><i style="width:' + Math.round(f * 100) + '%"></i></div><span>' + note + "</span></div>"; };
+    var made = Math.max(0, s.bal - A.start);
+    var room = '<div class="gauges">' +
+      gauge(R.mll < 600 ? "lossy" : "", "Room to the max loss", R.mll, A.mll[s.plan], "the account fails at " + usd(R.floor) + "; " + (R.mll > 0 ? Math.floor(R.mll / Math.max(1, s.risk)) : 0) + " full losses at " + usd(s.risk)) +
+      gauge(R.dll < 300 ? "lossy" : "", "Room today", R.dll, A.dll, "before the daily soft pause") +
+      gauge("goal", "Profit toward the target", made, A.target, R.toTarget > 0 ? usd(R.toTarget) + " to go" : "target reached: request your sim funded account") + "</div>";
+    $("acct-body").innerHTML = form + warn + room + "<h3>Account rules</h3>" + rules + '<p class="sub">Iron Brain is fitted to the <b>' + esc(A.name) + "</b>. Rules checked " + esc(A.checked) + ' from <a href="' + esc(A.source) + '">MyFundedFutures’ help center</a>. Prop rules change, so confirm them before trading. News trading is unrestricted on this plan.</p>' +
       '<p class="fine">Enter your numbers from the MyFundedFutures dashboard; they stay in this browser. The level checker on the desk sizes a stop against these limits.</p>';
     ["ac-plan", "ac-bal", "ac-peak", "ac-today", "ac-risk"].forEach(function (id) {
       $(id).onchange = function () {
         var o = { plan: $("ac-plan").value, bal: Number($("ac-bal").value) || A.start, peak: Number($("ac-peak").value) || A.start, today: Number($("ac-today").value) || 0, risk: Number($("ac-risk").value) || 300 };
         o.peak = Math.max(o.peak, A.start);
-        store.set("ib-acct", JSON.stringify(o)); acctView(); desk(false);
+        store.set("ib-acct", JSON.stringify(o)); acctView(); desk(false); chrome_();
       };
     });
   }
@@ -232,7 +299,8 @@
     var a = (x.account || []).filter(function (e) { return e.risk === 500; })[0] || (x.account || [])[0];
     if (!a) return "—";
     if (a.unsizeable) return '<span class="muted">stop too wide: 1 micro risks ' + usd(a.microRiskUsd) + "</span>";
-    return "pass " + pc(a.pass) + " <small>(luck " + pc(a.noEdge && a.noEdge.pass) + ", fail " + pc(a.breach) + ")</small>";
+    var lk = a.noEdge ? a.noEdge.pass : 0;
+    return '<span class="vs" title="Pass rate; the amber mark is luck"><i style="width:' + Math.round(a.pass * 100) + '%"></i><u style="left:' + Math.round(lk * 100) + '%"></u></span>pass ' + pc(a.pass) + " <small>luck " + pc(lk) + ", fail " + pc(a.breach) + "</small>";
   }
 
   /* ---- signals ---- */
@@ -286,11 +354,11 @@
       var V = VERDICT[x.verdict] || ["fail", x.verdict], res_ = '<span class="' + V[0] + '" title="' + esc(miss.map(function (k) { return "✗ " + CHECKS[k]; }).join("  ")) + '">' + V[1] + "</span>";
       var key = x.market + ":" + x.id, isOpen = key === open_;
       var lv = x.live || {}, today = lv.state === "signal" ? '<span class="sig ' + (!x.passed ? "paper" : lv.dir === "LONG" ? "long" : lv.dir === "SHORT" ? "short" : "") + '" title="' + (x.passed ? "Tested signal" : "Paper only: this strategy failed testing") + '">' + esc(lv.dir) + (x.passed ? "" : " · paper") + "</span>" : '<span class="muted">' + (lv.state === "waiting" ? "waiting" : lv.dir === "FLAT" ? "flat" : "none") + "</span>";
-      return '<tr class="srow' + (x.passed ? " ok" : "") + (isOpen ? " open" : "") + '" data-k="' + esc(key) + '"><td><b>' + esc(x.name) + "</b><small>" + (x.kind === "daily" ? "Daily, since " + esc(x.from.slice(0, 4)) : "Intraday, since " + esc(x.from.slice(0, 7))) + '</small></td><td class="n">' + x.trades + '</td><td class="n">' + pc(x.win) + '</td><td class="n ' + (x.perYearUsd >= 0 ? "pos" : "neg") + '">' + usd(x.perYearUsd) + '</td><td class="n">' + usd(-x.maxDdUsd) + '</td><td class="n">' + x.t.toFixed(1) + '</td><td class="n">' + pc(x.beatRandom) + '</td><td class="n">' + x.sharpe.toFixed(2) + " <small>(" + x.sharpeRange[0].toFixed(1) + " to " + x.sharpeRange[1].toFixed(1) + ")</small></td><td>" + res_ + "</td><td>" + acctCell(x) + "</td><td>" + today + "</td></tr>" +
+      return '<tr class="srow' + (x.passed ? " ok" : "") + (isOpen ? " open" : "") + '" data-k="' + esc(key) + '"><td><b>' + esc(x.name) + "</b><small>" + (x.kind === "daily" ? "Daily, since " + esc(x.from.slice(0, 4)) : "Intraday, since " + esc(x.from.slice(0, 7))) + '</small></td><td class="n">' + x.trades + '</td><td class="n">' + pc(x.win) + '</td><td class="n ' + (x.perYearUsd >= 0 ? "pos" : "neg") + '">' + usd(x.perYearUsd) + '</td><td class="n">' + usd(-x.maxDdUsd) + '</td><td class="n">' + x.t.toFixed(1) + '</td><td class="n">' + pc(x.beatRandom) + '</td><td class="n">' + ci(x) + x.sharpe.toFixed(2) + " <small>" + x.sharpeRange[0].toFixed(1) + " to " + x.sharpeRange[1].toFixed(1) + "</small></td><td>" + res_ + "</td><td>" + acctCell(x) + "</td><td>" + today + "</td></tr>" +
         (isOpen ? '<tr class="sdet"><td colspan="11">' + detail(x, v) + "</td></tr>" : "");
     }).join("");
     $("lab-body").innerHTML = head +
-      '<div class="card"><h3>' + esc(v.name) + ' strategies</h3><div class="scroll"><table class="t lab"><thead><tr><th>Strategy</th><th class="n">Trades</th><th class="n">Win</th><th class="n">Per year</th><th class="n">Max DD</th><th class="n">t</th><th class="n">vs random</th><th class="n">Sharpe (95% range)</th><th>Verdict</th><th>50K Builder eval<br><small>at $500 risk</small></th><th>Today</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+      '<div class="card"><h3>' + esc(v.name) + ' strategies</h3><div class="hscroll"><table class="t lab"><thead><tr><th>Strategy</th><th class="n">Trades</th><th class="n">Win</th><th class="n">Per year</th><th class="n">Max DD</th><th class="n">t</th><th class="n">vs random</th><th class="n">Sharpe (95% range)</th><th>Verdict</th><th>50K Builder eval<br><small>at $500 risk</small></th><th>Today</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
       '<p class="fine">Dollars are per full contract (one ' + esc(v.name) + " point is $" + v.pv + ") after costs. “vs random” is the share of 200 random-timing runs of the same rule that it beat. Sharpe is annualised, with the range the result is consistent with. <b>Inconclusive</b> means the data can’t rule a worthwhile edge (Sharpe ≥ " + Lb.meaningful + ") in or out; <b>no edge</b> means it can. <b>Promising</b> holds up on every check and is significant on its own, but not after allowing for " + Lb.trials + " tests. Click a row for details.</p></div>" +
       (Lb.changes ? '<details class="paper"><summary>Method changes (' + Lb.changes.length + ")</summary><ul>" + Lb.changes.map(function (c) { return "<li><b>" + esc(c[0]) + "</b> " + esc(c[1]) + "</li>"; }).join("") + "</ul><p class=\"fine\">The rules themselves are never edited. Changes to how they’re tested were made after seeing results, so the forward record, which no change can touch, is the cleaner test.</p></details>" : "");
     Array.prototype.forEach.call($("lab-body").querySelectorAll("tr.srow"), function (tr) {
@@ -307,6 +375,11 @@
       evalTable(x, v) +
       '<p><b>Forward record</b> since ' + esc(x.forward.since) + ": " + x.forward.trades + " trade" + (x.forward.trades === 1 ? "" : "s") + (x.forward.trades ? ", " + usd(x.forward.usd) : "") + ".</p></div>" +
       "<div>" + equity(x.curve) + (tr ? '<table class="t"><thead><tr><th>Date</th><th>Side</th><th class="n">In</th><th class="n">Out</th><th>Exit</th><th class="n">Net</th></tr></thead><tbody>' + tr + "</tbody></table>" : "") + "</div></div>";
+  }
+  function ci(x) {
+    var lo = -1.5, hi = 2.5, sc = function (y) { return Math.max(0, Math.min(100, (y - lo) / (hi - lo) * 100)); };
+    var a = sc(x.sharpeRange[0]), b = sc(x.sharpeRange[1]);
+    return '<span class="ci' + (x.sharpeRange[0] > 0 ? " good" : "") + '" title="Annual Sharpe and its 95% range; the line is zero"><span class="z" style="left:' + sc(0) + '%"></span><span class="rg" style="left:' + a + "%;width:" + Math.max(2, b - a) + '%"></span><span class="pt" style="left:' + sc(x.sharpe) + '%"></span></span>';
   }
   function evalTable(x, v) {
     if (!x.tradable) return '<p><b>50K Builder:</b> not allowed. This rule holds positions overnight, and MyFundedFutures closes every position at 16:10 New York.</p>';
@@ -387,9 +460,9 @@
     });
   }
   load().then(function () {
-    tabs(); acctView(); signalsView(); desk(true); labView(); testsView(); ctx();
+    route(); tabs(); acctView(); signalsView(); desk(true); labView(); testsView(); ctx(); chrome_();
     fetch("/displace/data/bias/current.json?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (b) { B = b; ctx(); }).catch(function () { ctx(); });
-    setInterval(function () { desk(false); }, 15000);
+    setInterval(function () { desk(false); chrome_(); }, 15000);
     setInterval(function () { load().then(function () { desk(false); signalsView(); }); }, 300000);
   }).catch(function () { $("desk-body").innerHTML = '<p class="muted">The desk data isn’t available yet.</p>'; });
   window.IB = { state: state, pTouch: pTouch, surv: surv };

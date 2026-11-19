@@ -3,99 +3,100 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#fbfbfd">
+<meta name="theme-color" content="#f5f7f6">
 <title>Iron Brain · Intraday desk</title>
-<meta name="description" content="Intraday odds for NQ and gold futures: how far price is likely to travel before a MyFundedFutures account is flattened at 16:10, the chance of a new high or low, and every number tested on days the model had not seen.">
+<meta name="description" content="An intraday desk for NQ and gold futures, fitted to a MyFundedFutures 50K Builder account: how far price can still go before the 16:10 flat, what size fits your loss limits, and which tested strategies the account allows.">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..110,400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<nav class="gnav" aria-label="Site">
-  <div class="wide">
-    <a class="brand" href="#top"><img src="icon.svg" width="26" height="26" alt="">Iron Brain</a>
-    <ul>
-      <li><a href="#account">Account</a></li>
-      <li><a href="#signals">Signals</a></li>
-      <li><a href="#desk">Desk</a></li>
-      <li><a href="#lab">Strategies</a></li>
-      <li><a href="#tests">Tests</a></li>
-      <li><a href="#method">Method</a></li>
-      <li><a class="out" href="/displace/#bias">Displace daily bias ›</a></li>
-    </ul>
+<header class="topbar">
+  <div class="bar-in">
+    <a class="brand" href="#desk"><img src="icon.svg" width="24" height="24" alt="">Iron Brain</a>
+    <div class="mkt" id="tabs" role="tablist" aria-label="Market"></div>
+    <div class="clock" id="clock" aria-live="polite"></div>
+    <a class="room" id="room" href="#account" title="Room to your account's limits"></a>
+    <a class="out" href="/displace/#bias">Displace</a>
+  </div>
+</header>
+
+<section class="strip-wrap" aria-label="Today's session">
+  <div class="strip-in">
+    <p class="strip-say" id="strip-say"></p>
+    <div id="strip"></div>
+  </div>
+</section>
+
+<nav class="views" aria-label="Sections">
+  <div class="views-in">
+    <a href="#desk" data-v="desk">Desk</a>
+    <a href="#signals" data-v="signals">Signals</a>
+    <a href="#lab" data-v="lab">Strategies</a>
+    <a href="#account" data-v="account">Account</a>
+    <a href="#tests" data-v="tests">Tests</a>
+    <a href="#method" data-v="method">Method</a>
   </div>
 </nav>
 
-<main id="top">
-  <header class="hero wide">
-    <p class="eyebrow">Intraday desk · NQ and gold futures</p>
-    <h1>Where price can still go today.</h1>
-    <p class="lede">Fitted to a MyFundedFutures 50K Builder account: the odds of reaching each level before the 16:10 New York flat time, the size that fits your loss limits, and which tested strategies the account allows. Every number is scored on days the model had not seen.</p>
-    <p class="note">Statistics and tested signals only. Prices from free futures bars, delayed up to about 20 minutes unless you type the live price or connect Live Bridge.</p>
-  </header>
-
-  <section id="account" class="wide band">
-    <h2>Your account</h2>
-    <div id="acct-body"><p class="muted">Loading account rules…</p></div>
-  </section>
-
-  <section id="signals" class="wide">
-    <h2>Signals</h2>
-    <p class="sub">Only strategies that passed testing give signals. Candidates came close and are shown as provisional; everything else is paper.</p>
-    <div id="sig-body"><p class="muted">Loading signals…</p></div>
-  </section>
-
-  <section id="desk" class="wide">
-    <div class="tabs" role="tablist" id="tabs"></div>
+<main>
+  <section class="view" id="desk" data-view="desk">
     <div id="desk-body"><p class="muted">Loading the desk…</p></div>
   </section>
 
-  <section id="context" class="wide band">
-    <h2>Today’s context from Displace</h2>
-    <div id="ctx"><p class="muted">Loading Displace’s daily bias…</p></div>
+  <section class="view" id="signals" data-view="signals" hidden>
+    <header class="vh"><h1>Signals</h1><p>Only strategies that passed testing and that your account allows give signals.</p></header>
+    <div id="sig-body"></div>
   </section>
 
-  <section id="lab" class="wide">
-    <h2>Strategy lab</h2>
-    <p class="sub">Trading rules written down before testing, with fixed parameters, real costs and a forward record. A strategy reaches the desk only if it passes every check.</p>
-    <div id="lab-body"><p class="muted">Loading the strategy lab…</p></div>
+  <section class="view" id="lab" data-view="lab" hidden>
+    <header class="vh"><h1>Strategies</h1><p>Rules written down before testing, with fixed parameters, real costs and a forward record.</p></header>
+    <div id="lab-body"></div>
   </section>
 
-  <section id="tests" class="wide">
-    <h2>How the numbers held up</h2>
-    <p class="sub">Walk-forward: the model is refit every 20 trading days on earlier days only and scored on the next 20.</p>
+  <section class="view" id="account" data-view="account" hidden>
+    <header class="vh"><h1>Your account</h1><p>Enter your numbers from the MyFundedFutures dashboard to see your room to each limit.</p></header>
+    <div id="acct-body"></div>
+  </section>
+
+  <section class="view" id="tests" data-view="tests" hidden>
+    <header class="vh"><h1>How the odds held up</h1><p>The model is refit every 20 trading days on earlier days only and scored on the next 20.</p></header>
     <div id="tests-body"></div>
   </section>
 
-  <section id="method" class="wide band">
-    <h2>Method</h2>
+  <section class="view prose" id="method" data-view="method" hidden>
+    <header class="vh"><h1>Method</h1><p>How the desk measures the day, and how the strategies are tested.</p></header>
     <div class="cols">
       <div>
-        <h3>The unit: expected remaining range</h3>
-        <p>A trading day runs 18:00 to 17:00 New York time. Each market’s typical daily range is tracked with a 20-day exponential average. The volatility profile measures how much of a day’s movement each hour usually carries, so at any moment the engine knows how much range is <i>still to come</i> before the 16:10 flat time of the MyFundedFutures account it is fitted to. Levels are expressed as fractions of that remaining range.</p>
+        <h3>The unit: range still to come</h3>
+        <p>A futures day runs from 18:00 to 17:00 New York time, and the MyFundedFutures account Iron Brain is fitted to is flattened at 16:10. Each market’s typical daily range is tracked with a 20-day exponential average. The volatility profile measures how much of a day’s movement each hour usually carries, so at any moment the engine knows how much range is still to come before the flat. Ladder levels are fractions of that remaining range.</p>
         <h3>Touch odds</h3>
-        <p>For every hour of every past day, the engine measured how far price went above and below that hour’s close before 16:00, in remaining-range units. Those distributions, kept separately for up and down moves, become the odds for any level you check. Late in the day, with only a bar or two left, moves fall short of what a single distribution expects, so each hour can get its own (pooled with the hours either side). That is used only where it beats the shared version out of sample: so far for NQ, not gold.</p>
+        <p>For every hour of every past day, the engine measured how far price went above and below that hour’s close before 16:00, in remaining-range units, separately for up and down moves. Those distributions become the odds for any level you check. Late in the day, with only a bar or two left, moves fall short of what a single distribution expects, so each hour can get its own (pooled with the hours either side), used only where that beats the shared version out of sample.</p>
+        <h3>Pace</h3>
+        <p>A fast day tends to stay fast. Today’s range so far, compared with what the profile expected by now, stretches or shrinks the remaining range. It is used only because it beat the plain model out of sample in both halves of the test.</p>
       </div>
       <div>
-        <h3>Pace</h3>
-        <p>A fast day tends to stay fast. Today’s range so far, compared with what the profile expected by now, stretches or shrinks the remaining range. This adjustment is used only because it beat the plain model out of sample in both halves of the test.</p>
         <h3>Strategy lab</h3>
-        <p>Every strategy was registered on 19 November 2026 with fixed rules, before any was run, and each is tested on both markets. Intraday rules decide on completed hourly bars, enter at the next bar’s open, check stops before targets inside a bar and are flat at the 16:00 bar close, inside the account’s 16:10 auto-close. Daily rules trade close to close; they hold overnight, so the 50K Builder doesn’t allow them and they’re kept as research. Costs are about one tick of slippage each side plus commission. To pass, a rule needs a t-statistic past one Bonferroni bar across every test, must beat 95% of 200 runs of the same rule at random times, and must be profitable in both halves of its history and over the last year. Each test also reports the smallest edge its data could detect, so a rule that couldn’t be judged is labelled inconclusive rather than failed. Intraday history: Dukascopy hourly mid prices (gold from 2010, NQ from 2018) until mid-2024, futures bars after. Trades after the registration date form a forward record the rules could not have been tuned on.</p>
-        <h3>What failed</h3>
-        <p>No hour of the day closes up more often than chance once you account for testing every hour in both markets. The desk shows those tests but leans on none of them. The opening-range statistics are still collecting: there are only about 60 days of free 5-minute bars, and they need 250 before they count.</p>
+        <p>Every strategy was registered with fixed rules before it was run, and each is tested on both markets. Intraday rules decide on completed hourly bars, enter at the next bar’s open, check stops before targets inside a bar and are flat at the 16:00 bar close. Daily rules trade close to close; they hold overnight, which the 50K Builder doesn’t allow, so they’re kept as research. Costs are about one tick of slippage each side plus commission.</p>
+        <p>To pass, a rule needs a t-statistic past one Bonferroni bar across every test, must beat 95% of 200 runs of the same rule at random times, and must be profitable in both halves of its history and over the last year. Each test also reports the smallest edge its data could detect, so a rule that couldn’t be judged is labelled inconclusive rather than failed. Trades after each rule’s registration date form a forward record it could not have been tuned on.</p>
+        <h3>The evaluation simulation</h3>
+        <p>For each rule the account allows, the lab replays the evaluation from the rule’s own history: micros sized at the rule’s stop, the $1,000 daily soft pause, and the max loss trailing the best end-of-day balance, over 60 trading days. The pass rate sits next to a luck baseline, the same trades with their average profit removed, because with a $3,000 target and a $2,000 drawdown even a coin flip passes fairly often.</p>
+        <h3>Data</h3>
+        <p>Futures bars from Yahoo Finance, archived by Displace; before mid-2024, Dukascopy hourly mid prices (gold from 2010, NQ from 2018) once that history finishes downloading.</p>
       </div>
     </div>
-  </section>
-
-  <section id="bridge" class="wide">
-    <h2>Live Bridge</h2>
-    <p>The optional Chrome extension reads the symbol and last price from your open TradingView tab titles and feeds them to this page, so the odds use the live price. It reads nothing else and sends nothing anywhere. To install it, load the <code>live-bridge</code> folder from the repository at <code>chrome://extensions</code> with Developer mode on.</p>
-    <p id="bridge-state" class="muted">Live Bridge not detected. Type the price above instead.</p>
+    <div class="bridge" id="bridge">
+      <h3>Live Bridge</h3>
+      <p>The optional Chrome extension reads the symbol and last price from your open TradingView tab titles, so the desk uses the live price. It reads nothing else and sends nothing anywhere. Load the <code>live-bridge</code> folder from the repository at <code>chrome://extensions</code> with Developer mode on.</p>
+      <p id="bridge-state" class="muted">Live Bridge not detected.</p>
+    </div>
   </section>
 </main>
 
-<footer class="wide">
-  <p>Iron Brain is the intraday half of <a href="/displace/">Displace</a>. Research and education only, not advice. Source data: Yahoo Finance futures bars, archived by Displace. Code: <a href="https://github.com/grobentham/iron-brain">github.com/grobentham/iron-brain</a>.</p>
-  <p id="updated" class="muted"></p>
+<footer>
+  <p>Iron Brain is the intraday half of <a href="/displace/">Displace</a>. Research and education only, not advice. Prop rules change: confirm them with MyFundedFutures before trading. <a href="https://github.com/grobentham/iron-brain">Source on GitHub</a>. <span id="updated"></span></p>
 </footer>
 <script src="app.js"></script>
 </body>
