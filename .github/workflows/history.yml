@@ -29,4 +29,11 @@ jobs:
           cd engine/cache/duka
           git add -A
           git -c user.name=iron-brain -c user.email=iron-brain@users.noreply.github.com commit -q -m "Dukascopy hourly history" || echo "nothing new"
-          git push -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" history-data
+          # another run may have saved first: its files never overlap with these, so rebase onto it and retry
+          url="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          for i in 1 2 3 4 5; do
+            git push -q "$url" history-data && break
+            git fetch -q --depth 50 "$url" history-data:refs/remotes/origin/history-data
+            git -c user.name=iron-brain -c user.email=iron-brain@users.noreply.github.com rebase -q origin/history-data || { git rebase --abort; exit 1; }
+            sleep 3
+          done
