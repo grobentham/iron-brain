@@ -64,6 +64,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python engine/alerts.py
+      - name: Stamp asset links with this build, so browsers fetch the new code at once
+        run: |
+          v=${GITHUB_SHA::8}
+          sed -i "s|href=\"styles.css\"|href=\"styles.css?v=$v\"|; s|src=\"app.js\"|src=\"app.js?v=$v\"|" site/index.html
+          grep -o 'app.js?v=[a-f0-9]*' site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
