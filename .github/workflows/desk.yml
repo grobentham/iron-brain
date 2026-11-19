@@ -32,6 +32,7 @@ jobs:
         run: |
           python engine/test_desk.py
           python engine/test_lab.py
+          python engine/test_account.py
       - name: Page and extension syntax
         run: |
           node --check site/app.js
