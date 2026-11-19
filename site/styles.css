@@ -209,3 +209,4 @@ footer{max-width:1180px;margin:0 auto;padding:20px 20px 50px;color:var(--ink3);f
 }
 @media (max-width:460px){.brand span,.brand{font-size:0;gap:0}.brand img{width:24px;height:24px}.mkt button{padding:5px 11px}.clock b{font-size:.95rem}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.px-src .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--up);margin-right:6px;vertical-align:1px}
