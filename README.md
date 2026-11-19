@@ -1,5 +1,9 @@
 # Iron Brain
 
+**Fitted to a MyFundedFutures 50K Builder account** (see `engine/account.py`): odds run to the 16:10 New York
+flat time, strategies that hold overnight are research only, sizing respects the 40-micro cap and the loss limits, and
+every tradable strategy shows its simulated evaluation pass rate next to what luck alone achieves.
+
 The intraday desk for [Displace](https://grobentham.github.io/displace/): walk-forward tested session statistics for
 NQ and gold futures, live at **https://grobentham.github.io/iron-brain/**.
 
@@ -36,6 +40,23 @@ As of November 2026 (about 420 test days): touch odds are calibrated within a po
 high/low odds beat the plain hourly rate by about 24% (Brier skill), and pace adds a small, significant improvement.
 
 `python engine/test_desk.py` checks that random walks pass no hour-of-day test and get calibrated touch odds.
+
+## The account
+
+`engine/account.py` holds the MyFundedFutures 50K Builder rules (checked 2026-11-20 against MyFundedFutures' help
+center): $3,000 target, $2,000 end-of-day trailing max loss ($1,500 on the Add-On) that locks at $50,100, $1,000
+daily loss soft pause, 4 minis / 40 micros, positions auto-closed at 16:10 New York with no overnight or weekend
+holding, news unrestricted. The page's account panel takes your balance, best end-of-day balance and today's P&L
+and shows your room to each limit; the desk's level checker sizes a stop against them.
+
+For each strategy the account can trade, the lab simulates the evaluation from the strategy's own history: micros at
+the rule's stop for a given risk, the daily loss limit as a cap, the trailing max loss, 60 trading days. It reports
+the pass and fail rates next to a no-edge baseline (the same trades with their average profit removed), because with
+a $3,000 target and $2,000 drawdown even a coin flip passes fairly often.
+
+As of November 2026 no strategy the account allows has passed testing, and none passes the simulated evaluation
+clearly more often than luck. The two that pass (NQ's 200-day trend filter, gold's turn of the month) hold overnight;
+their day-session versions, registered 2026-11-20, use stops too wide to size on this account.
 
 ## Strategy lab
 

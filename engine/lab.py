@@ -4,9 +4,10 @@ Every strategy below was written down on REGISTERED, before any of them was run,
 parameters. Each is run on NQ and gold, so there are len(STRATEGIES) x 2 tests, and one multiple-testing bar covers
 all of them. Changing a rule means registering a new strategy (and raising the bar), never editing an old one.
 
-Execution model
+Execution model (fitted to the prop account in account.py)
   intraday  decisions use completed hourly bars only; entry at the open of the next bar; stops and targets are
-            checked on later bars' highs and lows, stop first when both fall in one bar; flat by 17:00 New York
+            checked on later bars' highs and lows, stop first when both fall in one bar; flat at the 16:00 bar
+            close (the account is flattened at 16:10 New York)
   daily     close-to-close (Yahoo's daily futures opens are unreliable); a position held over consecutive days pays
             costs only when it changes
   costs     NQ 0.75 points and gold 0.3 points per round trip (about one tick of slippage each side plus commission)
@@ -29,6 +30,7 @@ from statistics import NormalDist
 
 import numpy as np
 
+import account as A
 import desk as D
 
 REGISTERED = "2026-11-19"
@@ -44,6 +46,9 @@ CHANGES = [
                    "2.4 years of futures bars, which could only detect an edge with an annual Sharpe near 2."],
     ["2026-11-19", "The deflated Sharpe ratio is reported but no longer required: on top of the Bonferroni bar it "
                    "counted the multiple testing twice (an effective t of about 3.6)."],
+    ["2026-11-20", "Fitted to MyFundedFutures 50K Builder: every intraday rule is flat at the 16:00 bar close (the "
+                   "account is flattened at 16:10); rules that hold overnight are research only. Registered two "
+                   "account-safe day-session versions of the daily trend filter and turn of the month (26 tests)."],
 ]
 ND = NormalDist()
 
@@ -60,7 +65,7 @@ def _ctx(day, k, s, w):
     """Day-so-far context available at the open of slot k."""
     _, O, H, L, C = day
     hi, lo = H[:k].max(), L[:k].min()
-    rem = math.sqrt(max(1e-9, w[k:].sum())) * s
+    rem = math.sqrt(max(1e-9, w[k:D.LAST + 1].sum())) * s
     done = math.sqrt(max(1e-9, w[:k].sum())) * s
     return O, H, L, C, hi, lo, rem, done
 
@@ -75,9 +80,9 @@ def i_exhaustion(day, s, w):
         pos = (C[k - 1] - lo) / (hi - lo)
         e = O[k]
         if pos >= 0.85:
-            return k, -1, hi * math.exp(0.25 * rem), (hi + lo) / 2, D.SLOTS - 1
+            return k, -1, hi * math.exp(0.25 * rem), (hi + lo) / 2, D.LAST
         if pos <= 0.15:
-            return k, 1, lo * math.exp(-0.25 * rem), (hi + lo) / 2, D.SLOTS - 1
+            return k, 1, lo * math.exp(-0.25 * rem), (hi + lo) / 2, D.LAST
     return None
 
 
@@ -90,7 +95,7 @@ def i_opening_drive(day, s, w):
     if abs(m) < 0.25 * s:
         return None
     d = 1 if m > 0 else -1
-    return k, d, O[k] * math.exp(-d * 0.5 * rem), None, D.SLOTS - 1
+    return k, d, O[k] * math.exp(-d * 0.5 * rem), None, D.LAST
 
 
 def i_overnight_fade(day, s, w):
@@ -102,12 +107,12 @@ def i_overnight_fade(day, s, w):
     if abs(m) < 0.3 * s:
         return None
     d = -1 if m > 0 else 1
-    return k, d, O[k] * math.exp(-d * 0.5 * rem), O[0], D.SLOTS - 1
+    return k, d, O[k] * math.exp(-d * 0.5 * rem), O[0], D.LAST
 
 
 def i_overnight_long(day, s, w):
     """Overnight drift: long from the 18:00 open to the 09:00 open every day. Stop one remaining range below."""
-    rem = math.sqrt(w.sum()) * s
+    rem = math.sqrt(w[:D.LAST + 1].sum()) * s
     return 0, 1, day[1][0] * math.exp(-rem), None, slot(8)
 
 
@@ -120,7 +125,7 @@ def i_late_momentum(day, s, w):
     if abs(m) < 0.25 * s:
         return None
     d = 1 if m > 0 else -1
-    return k, d, O[k] * math.exp(-d * 0.5 * rem), None, D.SLOTS - 1
+    return k, d, O[k] * math.exp(-d * 0.5 * rem), None, D.LAST
 
 
 def i_fast_trend(day, s, w):
@@ -132,10 +137,28 @@ def i_fast_trend(day, s, w):
         return None
     pos = (C[k - 1] - lo) / (hi - lo)
     if pos >= 0.8:
-        return k, 1, (hi + lo) / 2, None, D.SLOTS - 1
+        return k, 1, (hi + lo) / 2, None, D.LAST
     if pos <= 0.2:
-        return k, -1, (hi + lo) / 2, None, D.SLOTS - 1
+        return k, -1, (hi + lo) / 2, None, D.LAST
     return None
+
+
+def i_trend_day(day, s, w, ctx=None):
+    """Trend filter, account-safe: when the last daily close is above its 200-day average, long from the 18:00 open
+    to the 16:00 close. Stop one expected day range below the entry."""
+    if not ctx or not ctx.get("above200"):
+        return None
+    rem = math.sqrt(w[:D.LAST + 1].sum()) * s
+    return 0, 1, day[1][0] * math.exp(-rem), None, D.LAST
+
+
+def i_month_turn_day(day, s, w, ctx=None):
+    """Turn of the month, account-safe: long from the 18:00 open to the 16:00 close on each of the first three
+    trading days of the month. Stop one expected day range below the entry."""
+    if not ctx or not ctx.get("monthDay") or ctx["monthDay"] > 3:
+        return None
+    rem = math.sqrt(w[:D.LAST + 1].sum()) * s
+    return 0, 1, day[1][0] * math.exp(-rem), None, D.LAST
 
 
 # ---------- daily strategies (close to close) ----------
@@ -207,6 +230,10 @@ STRATEGIES = [
     {"id": "overnight-long", "name": "Overnight drift long", "kind": "intraday", "fn": i_overnight_long},
     {"id": "late-momentum", "name": "Late-day momentum", "kind": "intraday", "fn": i_late_momentum},
     {"id": "fast-trend", "name": "Fast trend day", "kind": "intraday", "fn": i_fast_trend},
+    {"id": "trend-day", "name": "Trend filter, day session", "kind": "intraday", "fn": i_trend_day, "daily": True,
+     "registered": "2026-11-20"},
+    {"id": "month-turn-day", "name": "Turn of the month, day session", "kind": "intraday", "fn": i_month_turn_day,
+     "daily": True, "registered": "2026-11-20"},
     {"id": "momentum-20", "name": "20-day momentum", "kind": "daily", "fn": d_momentum},
     {"id": "dip", "name": "Buy the big down day", "kind": "daily", "fn": d_dip},
     {"id": "trend-200", "name": "200-day trend filter", "kind": "daily", "fn": d_trend200},
@@ -215,6 +242,7 @@ STRATEGIES = [
 ]
 for _s in STRATEGIES:
     _s["rule"] = " ".join(_s["fn"].__doc__.split())
+    _s.setdefault("registered", REGISTERED)
 
 
 # ---------- simulation ----------
@@ -248,12 +276,37 @@ def profiles(days):
     return out
 
 
-def run_intraday(st, days, s, w, cost):
+def daily_context(days, daily_dates, daily_c):
+    """For each intraday day: was the last daily close (before that day) above its 200-day average, and which
+    trading day of the month is it? Only information known at the 18:00 open."""
+    if daily_dates is None or not len(daily_c):
+        return [None] * len(days)
+    idx = {d: i for i, d in enumerate(daily_dates)}
+    cs = np.cumsum(np.r_[0, daily_c])
+    rank, prev_m, r = {}, None, 0
+    for d in daily_dates:
+        m = d[:7]
+        r = r + 1 if m == prev_m else 1
+        prev_m = m
+        rank[d] = r
+    out = []
+    for day in days:
+        d = str(day[0])
+        j = np.searchsorted(np.array(daily_dates), d) - 1      # last daily close strictly before this day
+        if j < 199:
+            out.append(None)
+            continue
+        sma = (cs[j + 1] - cs[j - 199]) / 200
+        out.append({"above200": bool(daily_c[j] > sma), "monthDay": rank.get(d)})
+    return out
+
+
+def run_intraday(st, days, s, w, cost, ctx=None):
     trades = []
     for i, day in enumerate(days):
         if s[i] is None or w[i] is None:
             continue
-        plan = st["fn"](day, s[i], w[i])
+        plan = st["fn"](day, s[i], w[i], ctx[i]) if st.get("daily") else st["fn"](day, s[i], w[i])
         if not plan or not (0 <= plan[0] <= plan[4] < D.SLOTS):
             continue
         e, x, why, held = simulate(day, plan)
@@ -272,7 +325,7 @@ def random_intraday(trades, days, s, w, cost, rnd):
         k, d, stop, target, last = t["plan"]
         span = last - k
         i = rnd.choice(usable)
-        k2 = rnd.randrange(0, D.SLOTS - span)
+        k2 = rnd.randrange(0, D.LAST + 1 - span)
         day = days[i]
         f = day[1][k2] / days[t["i"]][1][k]          # move the stop and target with the price level
         plan = (k2, d, stop * f, target * f if target is not None else None, k2 + span)
@@ -399,7 +452,7 @@ def partial_day(rows1, now):
     return key, done, a
 
 
-def live_intraday(st, rows1, s_today, w, now):
+def live_intraday(st, rows1, s_today, w, now, ctx_today=None):
     """Today's state for an intraday rule, from the hourly bars completed so far."""
     if not s_today:
         return {"state": "no data"}
@@ -413,7 +466,7 @@ def live_intraday(st, rows1, s_today, w, now):
             np.where(np.isnan(L), np.inf, L), np.where(np.isnan(C), C[done - 1], C))
     with np.errstate(invalid="ignore", divide="ignore"):
         try:
-            plan = st["fn"](fill, s_today, w)
+            plan = st["fn"](fill, s_today, w, ctx_today) if st.get("daily") else st["fn"](fill, s_today, w)
         except (ValueError, ZeroDivisionError):
             plan = None
     if plan and plan[0] <= done:
@@ -429,7 +482,7 @@ def live_intraday(st, rows1, s_today, w, now):
 
 def _decision_slot(st):
     return {"exhaustion": slot(14), "opening-drive": slot(10), "overnight-fade": slot(9), "overnight-long": 0,
-            "late-momentum": slot(15), "fast-trend": slot(12)}[st["id"]]
+            "late-momentum": slot(15), "fast-trend": slot(12), "trend-day": 0, "month-turn-day": 0}[st["id"]]
 
 
 def _last_weekday(y, m):
@@ -517,12 +570,12 @@ def evaluate(r, trades, kind, rnd_runs, n_trials, bar):
             "checks": checks, "passed": passed, "verdict": verdict}
 
 
-def summary(trades, pv, rnd, dates_all):
+def summary(trades, pv, rnd, dates_all, registered=REGISTERED):
     pnl = [t["net"] * pv for t in trades]
     wins = [x for x in pnl if x > 0]
     losses = [-x for x in pnl if x <= 0]
     span_years = max(0.25, (dt.date.fromisoformat(dates_all[-1]) - dt.date.fromisoformat(dates_all[0])).days / 365.25)
-    fwd = [t for t in trades if t["date"] > REGISTERED]
+    fwd = [t for t in trades if t["date"] > registered]
     return {"trades": len(trades), "perYear": round(len(trades) / span_years, 1),
             "win": round(len(wins) / len(pnl), 3) if pnl else None,
             "avgPts": round(float(np.mean([t["net"] for t in trades])), 2) if trades else None,
@@ -531,8 +584,22 @@ def summary(trades, pv, rnd, dates_all):
             "maxDdUsd": round(drawdown(pnl)), "mcDd95Usd": round(mc_drawdown(pnl, rnd)) if len(pnl) >= 10 else None,
             "stops": round(float(np.mean([t["why"] == "stop" for t in trades])), 3) if trades else None,
             "curve": curve([t["date"] for t in trades], pnl),
-            "forward": {"since": REGISTERED, "trades": len(fwd), "usd": round(sum(t["net"] * pv for t in fwd))},
+            "forward": {"since": registered, "trades": len(fwd), "usd": round(sum(t["net"] * pv for t in fwd))},
             "from": dates_all[0], "to": dates_all[-1]}
+
+
+MICRO_COST = {"nq": 1.25, "gold": 0.35}   # points per round trip on a micro: 1 tick each side plus commission
+
+
+def account_eval(m, trades, n_days, cost):
+    """Evaluation odds on the fitted prop account, trading micros at the strategy's own stops."""
+    pv_micro = D.MARKETS[m]["micro"]
+    pts = np.zeros(n_days)
+    stops = [None] * n_days
+    for t in trades:
+        pts[t["i"]] += t["net"] + cost - MICRO_COST[m]   # swap the full-size cost for the micro cost
+        stops[t["i"]] = t["risk"]
+    return A.evaluations(pts.tolist(), stops, pv_micro)
 
 
 def run(intraday_data, daily_data, now, log=print, seed=7):
@@ -553,8 +620,17 @@ def run(intraday_data, daily_data, now, log=print, seed=7):
             R = [math.log(d[2].max() / d[3].min()) for d in days]
             a = 2 / (D.SPAN + 1)
             s_today = math.sqrt(a * R[-1] ** 2 + (1 - a) * s[-1] ** 2) if s[-1] else None
+            dd = daily_closes(daily_data[m], now) if m in daily_data else (None, np.array([]))
+            if dd[0] and m == "gold":   # Yahoo's daily gold candles before 2013 are placeholders
+                keep = [i for i, d in enumerate(dd[0]) if d >= "2013-01-01"]
+                dd = ([dd[0][i] for i in keep], dd[1][keep])
+            ctx = daily_context(days, *dd)
+            ctx_today = None
+            if dd[0]:
+                key = str(D.day_key(now.astimezone(D.NY)))
+                ctx_today = daily_context([(dt.date.fromisoformat(key),)], *dd)[0]
             for st in [x for x in STRATEGIES if x["kind"] == "intraday"]:
-                trades = run_intraday(st, days, s, w, cost)
+                trades = run_intraday(st, days, s, w, cost, ctx)
                 r = daily_series(len(days), trades)
                 rr = []
                 for _ in range(N_RANDOM if trades else 0):
@@ -563,7 +639,8 @@ def run(intraday_data, daily_data, now, log=print, seed=7):
                         x[i] += b
                     rr.append(x)
                 tests.append({"m": m, "st": st, "r": r, "trades": trades, "rnd": rr, "dates": dates, "pv": pv,
-                              "live": live_intraday(st, rows1, s_today, w_today, now)})
+                              "live": live_intraday(st, rows1, s_today, w_today, now, ctx_today),
+                              "acct": account_eval(m, trades, len(days), cost)})
         if m in daily_data:
             dates, c = daily_closes(daily_data[m], now)
             if m == "gold":
@@ -580,14 +657,18 @@ def run(intraday_data, daily_data, now, log=print, seed=7):
     out = []
     for t in tests:
         ev = evaluate(t["r"], t["trades"], t["st"]["kind"], t["rnd"], n_trials, bar)
-        sm = summary(t["trades"], t["pv"], rnd, t["dates"])
+        sm = summary(t["trades"], t["pv"], rnd, t["dates"], t["st"]["registered"])
         tier = {"passed": "tested", "promising": "candidate"}.get(ev["verdict"], "paper")
-        out.append({"tier": tier, "lastClose": t.get("last"), "avgDailyMove": t.get("range"), "id": t["st"]["id"], "name": t["st"]["name"], "kind": t["st"]["kind"], "rule": t["st"]["rule"],
+        tradable = t["st"]["kind"] != "daily"
+        if not tradable and tier in ("tested", "candidate"):
+            tier = "research"           # passes, but holds overnight: not allowed in the fitted account
+        out.append({"tier": tier, "tradable": tradable, "account": t.get("acct"),
+                    "registered": t["st"]["registered"], "lastClose": t.get("last"), "avgDailyMove": t.get("range"), "id": t["st"]["id"], "name": t["st"]["name"], "kind": t["st"]["kind"], "rule": t["st"]["rule"],
                     "market": t["m"], **ev, **sm, "live": t["live"],
                     "recentTrades": [{k: (round(v, 2) if isinstance(v, float) else v) for k, v in x.items()
                                       if k in ("date", "dir", "entry", "exit", "why", "net")} for x in t["trades"][-8:]]})
     passed = [f"{x['market']}:{x['id']}" for x in out if x["passed"]]
     cands = [f"{x['market']}:{x['id']}" for x in out if x["tier"] == "candidate"]
     log(f"lab: {len(out)} tests, bar t >= {bar:.2f}; passed {passed or 'none'}; candidates {cands or 'none'}")
-    return {"registered": REGISTERED, "trials": n_trials, "bar": round(bar, 2), "random": N_RANDOM,
+    return {"registered": REGISTERED, "trials": n_trials, "account": A.ACCOUNT, "bar": round(bar, 2), "random": N_RANDOM,
             "costs": COST, "changes": CHANGES, "meaningful": MEANINGFUL_SHARPE, "strategies": out}

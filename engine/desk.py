@@ -3,14 +3,15 @@
 History comes from Displace's bar archive (grobentham/displace engine/cache/bars, Yahoo futures bars that grow every
 run); the latest bars come straight from Yahoo. Everything is free and needs no key.
 
-A trading day runs from 18:00 to 17:00 New York time (23 hourly slots). For every hour of every day the engine asks:
-from this close, how far did price travel up and down before 17:00, as a share of the range expected for the rest of the
+A trading day runs from 18:00 to 17:00 New York time (23 hourly slots); the account it is fitted to (see account.py)
+is flattened at 16:10, so the horizon ends with the 15:00-16:00 bar. For every hour of every day the engine asks:
+from this close, how far did price travel up and down before 16:00, as a share of the range expected for the rest of the
 day (the day's typical range, scaled by how much of a day's movement is still to come)? The answers become the touch odds the page shows for any price and time, and every one of them is
 scored on days the model had not seen.
 
 Tests (all walk-forward, refit every 20 days on earlier days only):
-  touch     P(trading k x the expected remaining range above/below the price before 17:00), k = 1/4 .. 1
-  extreme   P(the day still makes a new high / new low after this hour) vs the plain rate for that hour
+  touch     P(trading k x the expected remaining range above/below the price before 16:00), k = 1/4 .. 1
+  extreme   P(a new high / new low before 16:00) vs the plain rate for that hour
   by hour   whether each hour needs its own distribution (late in the day moves fall short of a shared one)
   pace      whether today's range so far (fast or slow day) changes those odds; used only if it passes
   hours     whether any hour of the day closes up more often than chance (Bonferroni across hours and markets)
@@ -44,6 +45,8 @@ MARKETS = {
 }
 SLOTS = 23                      # 18:00 ... 16:00 bar starts
 SLOT_HOURS = [(18 + j) % 24 for j in range(SLOTS)]
+# MyFundedFutures flattens every account at 16:10 New York, so the trading horizon ends with the 15:00-16:00 bar
+LAST = SLOT_HOURS.index(15)
 KS = (0.25, 0.5, 0.75, 1.0)  # fractions of the expected remaining range
 BETAS = (0.0, 0.25, 0.5, 0.75, 1.0)
 GRID = np.round(np.arange(0, 5.001, 0.02), 2)
@@ -165,13 +168,13 @@ def checkpoints(days, s, w, idx):
         d, O, H, L, C = days[di]
         if s[di] is None:
             continue
-        for i in range(SLOTS - 1):
-            rem = math.sqrt(max(1e-9, cum[-1] - cum[i])) * s[di]
+        for i in range(LAST):
+            rem = math.sqrt(max(1e-9, cum[LAST] - cum[i])) * s[di]
             done = math.sqrt(cum[i]) * s[di]
             c = C[i]
             hs, ls = H[: i + 1].max(), L[: i + 1].min()
-            up = max(0.0, math.log(H[i + 1:].max() / c)) / rem
-            dn = max(0.0, math.log(c / L[i + 1:].min())) / rem
+            up = max(0.0, math.log(H[i + 1:LAST + 1].max() / c)) / rem
+            dn = max(0.0, math.log(c / L[i + 1:LAST + 1].min())) / rem
             rho = max(0.05, math.log(hs / ls) / done)
             rows.append((di, i, up, dn, math.log(hs / c) / rem, math.log(c / ls) / rem, rho))
     return np.array(rows, dtype=float).reshape(-1, 7)
@@ -200,7 +203,7 @@ def predict(train, test, beta, byhour=False):
     if not byhour:
         return _cols(survival(train[:, 2] / rt), survival(train[:, 3] / rt), test, rs)
     out = np.zeros((len(test), 2 * len(KS) + 2))
-    for g in range(SLOTS - 1):
+    for g in range(LAST):
         ms = test[:, 1] == g
         if not ms.any():
             continue
@@ -222,7 +225,7 @@ def outcomes(test):
 def slot_rates(train, test):
     """Plain per-hour rate of a later new high / new low: the benchmark for the extreme model."""
     out = np.zeros((len(test), 2))
-    for i in range(SLOTS - 1):
+    for i in range(LAST):
         a, b = train[:, 1] == i, test[:, 1] == i
         if a.any():
             out[b, 0] = (np.sum(train[a, 2] >= train[a, 4] + 1e-12) + 0.5) / (a.sum() + 1)
@@ -353,7 +356,7 @@ def worst_gap(rows, p, y):
     """Largest gap, in points of probability, between predicted and actual touch rates at any hour (k = 1/2)."""
     j = 2 * KS.index(0.5)
     g = 0.0
-    for i in range(SLOTS - 1):
+    for i in range(LAST):
         m = rows[:, 1] == i
         if m.any():
             g = max(g, abs(p[m, j].mean() - y[m, j].mean()), abs(p[m, j + 1].mean() - y[m, j + 1].mean()))
@@ -493,7 +496,7 @@ def finish(m, r, hour_bar, pace_bar, extreme_bar):
         Su, Sd = survival(rows[mask, 2] / rt[mask]), survival(rows[mask, 3] / rt[mask])
         return [round(float(x), 4) for x in Su(GRID)], [round(float(x), 4) for x in Sd(GRID)]
     if bh["passed"]:
-        t = [tables(np.abs(rows[:, 1] - g) <= NEIGHBOURS) for g in range(SLOTS - 1)]
+        t = [tables(np.abs(rows[:, 1] - g) <= NEIGHBOURS) for g in range(LAST)]
         surv_up, surv_dn = [a for a, _ in t], [b for _, b in t]
     else:
         surv_up, surv_dn = tables(np.ones(len(rows), bool))
@@ -501,7 +504,7 @@ def finish(m, r, hour_bar, pace_bar, extreme_bar):
     return {
         "name": meta["name"], "full": meta["full"], "tick": meta["tick"], "pv": meta["pv"], "micro": meta["micro"],
         "dp": meta["dp"],
-        "profile": [round(float(x), 5) for x in r["w"]], "hours": SLOT_HOURS,
+        "profile": [round(float(x), 5) for x in r["w"]], "hours": SLOT_HOURS, "last": LAST,
         "beta": beta, "grid": GRID.tolist(), "byHour": bh["passed"], "survUp": surv_up, "survDn": surv_dn,
         "tests": ev, "hourly": hour_tests(days[SPAN:], hour_bar),
         "opening": opening_range(r["rows5"]),
