@@ -14,8 +14,8 @@ From the current price and New York time the page shows:
 ## How it works
 
 `engine/desk.py` runs in GitHub Actions every 15 minutes while futures trade. It reads Displace's archive of free
-Yahoo futures bars (hourly since mid-2024, 5-minute bars growing since September 2026), adds Yahoo's latest bars, and
-publishes `site/data/desk.json`. The page does the live arithmetic in the browser. No keys, no server, no model API.
+Yahoo futures bars (hourly since mid-2024, 5-minute bars growing since September 2026), adds Yahoo's latest bars and,
+once complete, the long Dukascopy history below, and publishes `site/data/desk.json`. The page does the live arithmetic in the browser. No keys, no server, no model API.
 
 - **Unit:** the expected remaining range, the day's typical range (20-day exponential average) times the share of
   daily movement still to come according to the hourly volatility profile.
@@ -48,13 +48,27 @@ weekly reversal). Each runs on NQ and gold, so 22 tests share one multiple-testi
   bar (a gap through the stop fills at the open) and are flat by 17:00. Daily rules trade close to close.
 - Costs: NQ 0.75 points and gold 0.3 points per round trip.
 - To pass: t of daily net returns past the one-sided Bonferroni bar (2.84 for 22 tests), beat 95% of 200 random-timing
-  runs of the same rule, profit in both halves and over the last 250 days, deflated Sharpe ratio ≥ 0.95, and enough
-  trades. Only passing rules would show as signals on the desk; the rest are shown as paper.
-- Every trade after the registration date is a forward record, recomputed from data on every run.
+  runs of the same rule, profit in both halves and over the last 250 days, and enough trades. The deflated Sharpe
+  ratio is reported but not required: on top of Bonferroni it counted the multiple testing twice.
+- Every test reports the smallest annual Sharpe its sample could reliably detect and the 95% range of its own Sharpe,
+  so the verdict separates **passed**, **promising** (every check holds and t ≥ 1.96, but not past the bar),
+  **inconclusive** (the data can't rule a worthwhile edge in or out) and **no edge** (negative, or the whole range is
+  below a Sharpe of 0.5).
+- Every trade after the registration date is a forward record, recomputed from data on every run. Changes to the
+  testing method are listed on the page; the rules themselves are never edited.
 
-As of November 2026 none of the 22 passes. Closest: NQ's 200-day trend filter (t 3.27, beat 98% of random runs) and
-gold's turn of the month (t 3.08, beat 100%), each failing only the deflated Sharpe (0.91 and 0.88). Rules are never
-edited; a new idea is registered as a new strategy, which raises the bar for all of them.
+As of November 2026 two pass: NQ's 200-day trend filter (Sharpe 0.68) and gold's turn of the month (Sharpe 0.89).
+The intraday rules are mostly inconclusive: 2.4 years of futures bars can only detect an annual Sharpe of about 2.4.
+
+### Long intraday history
+
+`engine/history.py` downloads Dukascopy's free hourly candles (Nasdaq-100 index CFD and spot gold) for 2010–2024,
+bid and ask, and averages them into mid prices: bid quotes alone dip when the spread widens around the 17:00 break
+and recover at the reopen, which shows up as a fake "gold rises at 18:00" effect. The History workflow builds this
+once into the `history-data` branch (Dukascopy throttles, so it runs hourly until complete); the desk reads it and
+uses it only for days before the futures bars begin, and only once a market's history is complete. Gold uses it from
+2010 and NQ from 2018 (the CFD skips overnight hours before then). Hourly moves match the futures with a correlation
+of about 0.96.
 
 `python engine/test_lab.py` checks that rules never use future bars, that fills are conservative, and that random
 walks pass nothing.

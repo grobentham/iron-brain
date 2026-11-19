@@ -553,6 +553,4 @@ def run(source=None, fresh=True, now=None, out=OUT, log=print, history=None):
 if __name__ == "__main__":
     import history as HIST
     src = sys.argv[1] if len(sys.argv) > 1 else None
-    if src is None:
-        HIST.sync()
     run(source=src, fresh=src is None, history=HIST.load)

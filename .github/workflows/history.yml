@@ -3,26 +3,26 @@ name: History
 # reports nothing missing. The desk workflow only reads this branch.
 on:
   workflow_dispatch:
-  push:
-    branches: [claude/history-probe]
+  schedule:
+    - cron: "41 * * * *"   # hourly until complete; exits in seconds once nothing is missing
 permissions:
   contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Check out the history-data branch
         run: |
-          git fetch -q --depth 1 origin history-data && git worktree add -q engine/cache/duka origin/history-data || mkdir -p engine/cache/duka
+          git fetch -q --depth 1 origin +refs/heads/history-data:refs/remotes/origin/history-data
+          git worktree add -q -B history-data engine/cache/duka origin/history-data
       - name: Fetch missing months
         run: python3 engine/history.py
       - name: Save to history-data
+        if: always()
         run: |
           cd engine/cache/duka
-          if [ ! -d .git ] && [ ! -f .git ]; then git init -q -b history-data; fi
-          git checkout -q -B history-data
           git add -A
           git -c user.name=iron-brain -c user.email=iron-brain@users.noreply.github.com commit -q -m "Dukascopy hourly history" || echo "nothing new"
-          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" history-data
+          git push -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" history-data

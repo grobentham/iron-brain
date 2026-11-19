@@ -68,7 +68,7 @@ def fetch(inst, y, m, side, tries=3):
     return None
 
 
-def sync(budget_s=1500, workers=2, log=print):
+def sync(budget_s=2700, workers=2, log=print):
     """Fetch missing month files, politely, until done or out of time. Returns how many are still missing."""
     jobs = [(m, inst, side, y, mo) for m, inst in INSTRUMENTS.items() for side in SIDES for y, mo in months()
             if not os.path.exists(path(m, side, y, mo))]
@@ -94,19 +94,20 @@ def sync(budget_s=1500, workers=2, log=print):
                     json.dump(bars, fh, separators=(",", ":"))
                 done += 1
             if (done + failed) % 25 == 0:
-                log(f"history: {done} fetched, {failed} failed, {int(time.time() - t0)}s", flush=True)
+                print(f"history: {done} fetched, {failed} failed, {int(time.time() - t0)}s", flush=True)
     left = sum(not os.path.exists(path(m, side, y, mo)) for m in INSTRUMENTS for side in SIDES for y, mo in months())
     log(f"history: fetched {done}, failed {failed}, still missing {left}")
     return left
 
 
 def load(m):
-    """Cached hourly mid-price bars for a market: {iso utc: [o,h,l,c]}. Months without both sides are skipped."""
+    """Cached hourly mid-price bars for a market: {iso utc: [o,h,l,c]}, or {} until every month has both sides
+    (a partial history would leave gaps in the daily scale and profile)."""
     out = {}
     for y, mo in months():
         pb, pa = path(m, "BID", y, mo), path(m, "ASK", y, mo)
         if not (os.path.exists(pb) and os.path.exists(pa)):
-            continue
+            return {}
         bid, ask = json.load(open(pb)), json.load(open(pa))
         for t, b in bid.items():
             a = ask.get(t)
