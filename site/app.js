@@ -182,6 +182,36 @@
       '</div><p class="fine">The daily forecast comes from Displace’s volatility model; the desk above works out where price can go from here within the day. <a href="/displace/#bias">Full daily bias ›</a></p>';
   }
 
+  /* ---- signals ---- */
+  function signalsView() {
+    var Lb = D.lab;
+    if (!Lb) { $("sig-body").innerHTML = '<p class="muted">The strategy lab hasn’t run yet.</p>'; return; }
+    var all = Lb.strategies, tested = all.filter(function (x) { return x.tier === "tested"; }), cand = all.filter(function (x) { return x.tier === "candidate"; });
+    var paper = all.filter(function (x) { return x.tier === "paper" && x.live && x.live.state === "signal"; });
+    var risk = Number(store.get("ib-risk") || 500);
+    var html = '<div class="sig-sum"><span><b>' + tested.length + "</b> tested</span><span><b>" + cand.length + "</b> candidate" + (cand.length === 1 ? "" : "s") + "</span><span><b>" + (all.length - tested.length - cand.length) + "</b> paper</span>" +
+      '<label class="riskin">Risk per trade $<input id="sig-risk" inputmode="decimal" value="' + risk + '"></label></div>';
+    html += '<h3 class="tier">Tested</h3>' + (tested.length ? '<div class="sig-grid">' + tested.map(function (x) { return sigCard(x, risk); }).join("") + "</div>" :
+      '<div class="empty">No strategy has passed every test yet, so there are no tested signals. That’s the honest answer: ' + Lb.trials + " rules were tested and none cleared the bar.</div>");
+    html += '<h3 class="tier">Candidates <small>provisional · passed everything except the deflated Sharpe</small></h3>' + (cand.length ? '<div class="sig-grid">' + cand.map(function (x) { return sigCard(x, risk); }).join("") + "</div>" : '<p class="muted">None.</p>');
+    html += '<details class="paper"><summary>Paper positions today (' + paper.length + ") · failed testing, for the record only</summary>" +
+      (paper.length ? "<ul>" + paper.map(function (x) { var lv = x.live; return "<li>" + esc(D.markets[x.market].name) + " · " + esc(x.name) + ": <b>" + esc(lv.dir) + "</b>" + (lv.entry ? " from " + fmt(lv.entry, D.markets[x.market]) + ", stop " + fmt(lv.stop, D.markets[x.market]) : "") + "</li>"; }).join("") + "</ul>" : '<p class="muted">None today.</p>') + "</details>" +
+      '<p class="fine">Alerts: when a tested or candidate signal changes, the engine opens an issue in the <a href="https://github.com/grobentham/iron-brain/issues?q=label%3Asignal">iron-brain repository</a>, which GitHub sends to its owner by email or the GitHub app. Research only, not advice.</p>';
+    $("sig-body").innerHTML = html;
+    $("sig-risk").onchange = function () { var x = Number($("sig-risk").value); if (x > 0) { store.set("ib-risk", String(x)); signalsView(); } };
+  }
+  function sigCard(x, risk) {
+    var v = D.markets[x.market], lv = x.live || {}, on = lv.state === "signal";
+    var stopPts = on && lv.stop && lv.entry ? Math.abs(lv.entry - lv.stop) : x.avgDailyMove;
+    var nf = stopPts ? Math.floor(risk / (stopPts * v.pv)) : 0, nm = stopPts ? Math.floor(risk / (stopPts * v.micro)) : 0;
+    var pos = on ? '<span class="sig ' + (lv.dir === "LONG" ? "long" : "short") + '">' + esc(lv.dir) + "</span>" : '<span class="sig">' + esc(lv.dir === "FLAT" ? "FLAT" : "NO SIGNAL") + "</span>";
+    var plan = on && lv.entry ? "Entry " + fmt(lv.entry, v) + " at " + esc(lv.at) + " · stop " + fmt(lv.stop, v) + (lv.target ? " · target " + fmt(lv.target, v) : "") + " · out by " + esc(lv.exitBy) : esc(lv.note || "");
+    var size = stopPts ? "At $" + Math.round(risk).toLocaleString("en-US") + " risk " + (on && lv.stop ? "to the stop (" + pts(stopPts, v) + " pts)" : "and a stop one average daily move away (" + pts(Math.round(stopPts / v.tick) * v.tick, v) + " pts; the rule itself has no stop)") + (nm ? ": <b>" + nf + "</b> full or <b>" + nm + "</b> micro." : ": too small for one contract. One micro risks " + usd(stopPts * v.micro) + " here.") : "";
+    return '<div class="scard ' + x.tier + '"><div class="sc-top"><span class="tierb ' + x.tier + '">' + (x.tier === "tested" ? "TESTED" : "CANDIDATE") + '</span><b>' + esc(v.name) + " · " + esc(x.name) + "</b>" + pos + "</div>" +
+      '<p class="sc-rule">' + esc(x.rule) + "</p><p>" + plan + "</p>" + (lv.next ? "<p><b>Next:</b> " + esc(lv.next) + "</p>" : "") + (size ? '<p class="sc-size">' + size + "</p>" : "") +
+      '<p class="fine">Backtest ' + esc(x.from.slice(0, 4)) + "–" + esc(x.to.slice(0, 4)) + ": " + usd(x.perYearUsd) + "/yr per contract, max drawdown " + usd(-x.maxDdUsd) + " · t " + x.t.toFixed(2) + " · beat " + pc(x.beatRandom) + " of random runs · deflated Sharpe " + (x.dsr == null ? "—" : x.dsr.toFixed(2)) + (x.tier === "candidate" ? " (needs 0.95)" : "") + " · forward record: " + x.forward.trades + " trade" + (x.forward.trades === 1 ? "" : "s") + (x.forward.trades ? ", " + usd(x.forward.usd) : "") + " since " + esc(x.forward.since) + ".</p></div>";
+  }
+
   /* ---- strategy lab ---- */
   var CHECKS = { t: "t past the bar", random: "beats random timing", halves: "profit in both halves", recent: "profit over the last year", dsr: "deflated Sharpe ≥ 0.95", sample: "enough trades" };
   var open_ = store.get("ib-lab-open") || "";
@@ -198,7 +228,7 @@
       stat("Costs", v.name + " " + Lb.costs[cur] + " pts", "per round trip, about one tick each side plus commission") + "</div>";
     var rows = mine.map(function (x) {
       var miss = Object.keys(x.checks).filter(function (k) { return !x.checks[k]; });
-      var res_ = x.passed ? '<span class="pass">Passed</span>' : miss.length === 1 ? '<span class="mid">Close · ' + esc(CHECKS[miss[0]]) + "</span>" : '<span class="fail">Failed ' + miss.length + "</span>";
+      var res_ = x.passed ? '<span class="pass">Passed</span>' : x.tier === "candidate" ? '<span class="mid">Candidate · ' + esc(CHECKS[miss[0]]) + "</span>" : miss.length === 1 ? '<span class="mid">Close · ' + esc(CHECKS[miss[0]]) + "</span>" : '<span class="fail">Failed ' + miss.length + "</span>";
       var key = x.market + ":" + x.id, isOpen = key === open_;
       var lv = x.live || {}, today = lv.state === "signal" ? '<span class="sig ' + (!x.passed ? "paper" : lv.dir === "LONG" ? "long" : lv.dir === "SHORT" ? "short" : "") + '" title="' + (x.passed ? "Tested signal" : "Paper only: this strategy failed testing") + '">' + esc(lv.dir) + (x.passed ? "" : " · paper") + "</span>" : '<span class="muted">' + (lv.state === "waiting" ? "waiting" : lv.dir === "FLAT" ? "flat" : "none") + "</span>";
       return '<tr class="srow' + (x.passed ? " ok" : "") + (isOpen ? " open" : "") + '" data-k="' + esc(key) + '"><td><b>' + esc(x.name) + "</b><small>" + (x.kind === "daily" ? "Daily, since " + esc(x.from.slice(0, 4)) : "Intraday, since " + esc(x.from.slice(0, 7))) + '</small></td><td class="n">' + x.trades + '</td><td class="n">' + pc(x.win) + '</td><td class="n ' + (x.perYearUsd >= 0 ? "pos" : "neg") + '">' + usd(x.perYearUsd) + '</td><td class="n">' + usd(-x.maxDdUsd) + '</td><td class="n">' + x.t.toFixed(1) + '</td><td class="n">' + pc(x.beatRandom) + '</td><td class="n">' + (x.dsr == null ? "—" : x.dsr.toFixed(2)) + "</td><td>" + res_ + "</td><td>" + today + "</td></tr>" +
@@ -292,10 +322,10 @@
     });
   }
   load().then(function () {
-    tabs(); desk(true); labView(); testsView(); ctx();
+    tabs(); signalsView(); desk(true); labView(); testsView(); ctx();
     fetch("/displace/data/bias/current.json?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (b) { B = b; ctx(); }).catch(function () { ctx(); });
     setInterval(function () { desk(false); }, 15000);
-    setInterval(function () { load().then(function () { desk(false); }); }, 300000);
+    setInterval(function () { load().then(function () { desk(false); signalsView(); }); }, 300000);
   }).catch(function () { $("desk-body").innerHTML = '<p class="muted">The desk data isn’t available yet.</p>'; });
   window.IB = { state: state, pTouch: pTouch, surv: surv };
 })();

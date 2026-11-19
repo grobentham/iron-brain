@@ -13,6 +13,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  issues: write
 
 concurrency:
   group: desk-${{ github.ref }}
@@ -53,6 +54,11 @@ jobs:
       - run: python -m pip install --quiet "numpy>=2,<3"
       - name: Run the desk engine
         run: python engine/desk.py
+      - name: Alert on new signals
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python engine/alerts.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

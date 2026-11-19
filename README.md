@@ -59,6 +59,18 @@ edited; a new idea is registered as a new strategy, which raises the bar for all
 `python engine/test_lab.py` checks that rules never use future bars, that fills are conservative, and that random
 walks pass nothing.
 
+## Signals and alerts
+
+The Signals panel at the top of the page has three tiers. **Tested** strategies passed every check and are the only
+real signals (none yet). **Candidates** passed everything except the deflated Sharpe and are shown as provisional
+signals with their next trigger, position size and forward record (as of November 2026: NQ's 200-day trend filter
+and gold's turn of the month). Everything else is **paper**, listed for the record. A candidate becomes tested only
+if its deflated Sharpe reaches 0.95 as data accumulates; the bar is never lowered.
+
+`engine/alerts.py` runs after each scheduled engine run and compares the new signals with the ones live on the site.
+When a tested or candidate signal appears or changes, it opens an issue labelled `signal` in this repository, so
+GitHub notifies the owner by email or the GitHub app.
+
 ## Live Bridge
 
 `live-bridge/` is an optional Chrome/Opera extension that reads the symbol and price from TradingView tab titles so the
