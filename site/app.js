@@ -90,7 +90,7 @@
       return '<button role="tab" aria-selected="' + (m === cur) + '" data-m="' + m + '">' + esc(v.name) + "<small>" + esc(v.full) + "</small></button>";
     }).join("");
     Array.prototype.forEach.call($("tabs").querySelectorAll("button"), function (b) {
-      b.onclick = function () { cur = b.getAttribute("data-m"); store.set("ib-market", cur); tabs(); desk(true); ctx(); testsView(); };
+      b.onclick = function () { cur = b.getAttribute("data-m"); store.set("ib-market", cur); tabs(); desk(true); ctx(); labView(); testsView(); };
     });
   }
 
@@ -182,6 +182,53 @@
       '</div><p class="fine">The daily forecast comes from Displace’s volatility model; the desk above works out where price can go from here within the day. <a href="/displace/#bias">Full daily bias ›</a></p>';
   }
 
+  /* ---- strategy lab ---- */
+  var CHECKS = { t: "t past the bar", random: "beats random timing", halves: "profit in both halves", recent: "profit over the last year", dsr: "deflated Sharpe ≥ 0.95", sample: "enough trades" };
+  var open_ = store.get("ib-lab-open") || "";
+  function usd(x) { return x == null ? "—" : (x < 0 ? "−$" : "$") + Math.abs(Math.round(x)).toLocaleString("en-US"); }
+  function labView() {
+    var Lb = D.lab;
+    if (!Lb) { $("lab-body").innerHTML = '<p class="muted">The strategy lab hasn’t run yet.</p>'; return; }
+    var all = Lb.strategies, mine = all.filter(function (x) { return x.market === cur; }), v = D.markets[cur];
+    var passed = all.filter(function (x) { return x.passed; });
+    var head = '<div class="stats">' +
+      stat("Registered", esc(Lb.registered), Lb.trials + " tests: " + (Lb.trials / 2) + " rules × 2 markets") +
+      stat("Passed", passed.length + " of " + Lb.trials, passed.length ? passed.map(function (x) { return x.name + " (" + D.markets[x.market].name + ")"; }).join(", ") : "nothing has earned a place on the desk") +
+      stat("Bar", "t ≥ " + Lb.bar.toFixed(2), "5% split across all " + Lb.trials + " tests, plus four more checks") +
+      stat("Costs", v.name + " " + Lb.costs[cur] + " pts", "per round trip, about one tick each side plus commission") + "</div>";
+    var rows = mine.map(function (x) {
+      var miss = Object.keys(x.checks).filter(function (k) { return !x.checks[k]; });
+      var res_ = x.passed ? '<span class="pass">Passed</span>' : miss.length === 1 ? '<span class="mid">Close · ' + esc(CHECKS[miss[0]]) + "</span>" : '<span class="fail">Failed ' + miss.length + "</span>";
+      var key = x.market + ":" + x.id, isOpen = key === open_;
+      var lv = x.live || {}, today = lv.state === "signal" ? '<span class="sig ' + (!x.passed ? "paper" : lv.dir === "LONG" ? "long" : lv.dir === "SHORT" ? "short" : "") + '" title="' + (x.passed ? "Tested signal" : "Paper only: this strategy failed testing") + '">' + esc(lv.dir) + (x.passed ? "" : " · paper") + "</span>" : '<span class="muted">' + (lv.state === "waiting" ? "waiting" : lv.dir === "FLAT" ? "flat" : "none") + "</span>";
+      return '<tr class="srow' + (x.passed ? " ok" : "") + (isOpen ? " open" : "") + '" data-k="' + esc(key) + '"><td><b>' + esc(x.name) + "</b><small>" + (x.kind === "daily" ? "Daily, since " + esc(x.from.slice(0, 4)) : "Intraday, since " + esc(x.from.slice(0, 7))) + '</small></td><td class="n">' + x.trades + '</td><td class="n">' + pc(x.win) + '</td><td class="n ' + (x.perYearUsd >= 0 ? "pos" : "neg") + '">' + usd(x.perYearUsd) + '</td><td class="n">' + usd(-x.maxDdUsd) + '</td><td class="n">' + x.t.toFixed(1) + '</td><td class="n">' + pc(x.beatRandom) + '</td><td class="n">' + (x.dsr == null ? "—" : x.dsr.toFixed(2)) + "</td><td>" + res_ + "</td><td>" + today + "</td></tr>" +
+        (isOpen ? '<tr class="sdet"><td colspan="10">' + detail(x, v) + "</td></tr>" : "");
+    }).join("");
+    $("lab-body").innerHTML = head +
+      '<div class="card"><h3>' + esc(v.name) + ' strategies</h3><div class="scroll"><table class="t lab"><thead><tr><th>Strategy</th><th class="n">Trades</th><th class="n">Win</th><th class="n">Per year</th><th class="n">Max DD</th><th class="n">t</th><th class="n">vs random</th><th class="n">DSR</th><th>Result</th><th>Today</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+      '<p class="fine">Dollars are per full contract (one ' + esc(v.name) + " point is $" + v.pv + ") after costs. “vs random” is the share of 200 random-timing runs of the same rule that it beat. Only strategies that pass every check would show as signals on the desk; the rest are shown for the record. Click a row for the rule, its checks and equity curve.</p></div>";
+    Array.prototype.forEach.call($("lab-body").querySelectorAll("tr.srow"), function (tr) {
+      tr.onclick = function () { var k = tr.getAttribute("data-k"); open_ = open_ === k ? "" : k; store.set("ib-lab-open", open_); labView(); };
+    });
+  }
+  function detail(x, v) {
+    var lv = x.live || {}, checks = Object.keys(x.checks).map(function (k) { return '<li class="' + (x.checks[k] ? "y" : "n") + '">' + esc(CHECKS[k]) + "</li>"; }).join("");
+    var live = lv.state === "signal" ? "<b>" + esc(lv.dir) + "</b>" + (lv.entry ? " from " + fmt(lv.entry, v) + " at " + esc(lv.at) + ", stop " + fmt(lv.stop, v) + (lv.target ? ", target " + fmt(lv.target, v) : "") + ", out by " + esc(lv.exitBy) : " · " + esc(lv.note || "")) : esc(lv.note || (lv.dir === "FLAT" ? "Flat." : "No signal."));
+    var tr = (x.recentTrades || []).slice().reverse().map(function (t) { return "<tr><td>" + esc(t.date) + "</td><td>" + (t.dir > 0 ? "Long" : "Short") + '</td><td class="n">' + fmt(t.entry, v) + '</td><td class="n">' + fmt(t.exit, v) + "</td><td>" + esc(t.why) + '</td><td class="n ' + (t.net >= 0 ? "pos" : "neg") + '">' + usd(t.net * v.pv) + "</td></tr>"; }).join("");
+    return '<div class="det"><div><p class="rule">' + esc(x.rule) + '</p><ul class="checks">' + checks + "</ul>" +
+      '<p class="fine">t ' + x.t.toFixed(2) + " (bar " + D.lab.bar.toFixed(2) + ") · beat " + pc(x.beatRandom) + " of random runs · halves " + Math.round(x.halvesBp[0]) + " / " + Math.round(x.halvesBp[1]) + " bp · last year " + Math.round(x.recentBp) + " bp · profit factor " + (x.pf == null ? "—" : x.pf.toFixed(2)) + " · stopped out " + pc(x.stops) + " · 95% Monte Carlo drawdown " + usd(-x.mcDd95Usd) + "</p>" +
+      '<p><b>Today' + (x.passed ? "" : " (paper only)") + ":</b> " + live + "</p>" +
+      '<p><b>Forward record</b> since ' + esc(x.forward.since) + ": " + x.forward.trades + " trade" + (x.forward.trades === 1 ? "" : "s") + (x.forward.trades ? ", " + usd(x.forward.usd) : "") + ".</p></div>" +
+      "<div>" + equity(x.curve) + (tr ? '<table class="t"><thead><tr><th>Date</th><th>Side</th><th class="n">In</th><th class="n">Out</th><th>Exit</th><th class="n">Net</th></tr></thead><tbody>' + tr + "</tbody></table>" : "") + "</div></div>";
+  }
+  function equity(c) {
+    if (!c || c.length < 2) return '<p class="muted">Not enough trades for a curve.</p>';
+    var W = 420, H = 150, ys = c.map(function (p) { return p[1]; }), lo = Math.min(0, Math.min.apply(null, ys)), hi = Math.max(0, Math.max.apply(null, ys)), sp = hi - lo || 1;
+    var X = function (i) { return 4 + (i / (c.length - 1)) * (W - 8); }, Y = function (y) { return 8 + (1 - (y - lo) / sp) * (H - 28); };
+    var d = c.map(function (p, i) { return (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p[1]).toFixed(1); }).join(" ");
+    return '<svg class="eq" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Equity curve"><line x1="4" x2="' + (W - 4) + '" y1="' + Y(0).toFixed(1) + '" y2="' + Y(0).toFixed(1) + '"/><path d="' + d + '" class="' + (ys[ys.length - 1] >= 0 ? "up" : "dn") + '"/><text x="4" y="' + (H - 4) + '">' + esc(c[0][0].slice(0, 7)) + '</text><text x="' + (W - 4) + '" y="' + (H - 4) + '" text-anchor="end">' + esc(c[c.length - 1][0].slice(0, 7)) + " · " + usd(ys[ys.length - 1]) + "</text></svg>";
+  }
+
   /* ---- tests ---- */
   function res(ok, mid) { return ok ? '<span class="pass">Passed</span>' : mid ? '<span class="mid">' + mid + "</span>" : '<span class="fail">Failed</span>'; }
   function testsView() {
@@ -245,7 +292,7 @@
     });
   }
   load().then(function () {
-    tabs(); desk(true); testsView(); ctx();
+    tabs(); desk(true); labView(); testsView(); ctx();
     fetch("/displace/data/bias/current.json?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (b) { B = b; ctx(); }).catch(function () { ctx(); });
     setInterval(function () { desk(false); }, 15000);
     setInterval(function () { load().then(function () { desk(false); }); }, 300000);

@@ -33,6 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(ROOT, "site", "data", "desk.json")
 ARCHIVE = "https://raw.githubusercontent.com/grobentham/displace/main/engine/cache/bars/{m}_{iv}.json"
+DAILY = "https://raw.githubusercontent.com/grobentham/displace/main/engine/cache/daily/{m}.json"
 YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart/{s}?range={r}&interval={iv}"
 UA = {"User-Agent": "Mozilla/5.0 (Iron Brain intraday desk; +https://github.com/grobentham/iron-brain)"}
 MARKETS = {
@@ -90,6 +91,17 @@ def load_bars(m, interval, source=None, fresh=True, log=print):
         except Exception as e:
             log(f"desk: {m} {interval} latest bars unavailable ({e!r})")
     return {k: v[:4] for k, v in bars.items()}
+
+
+def load_daily(m, source=None, log=print):
+    """{date: [o,h,l,c]} daily futures candles since 2000 from Displace's archive."""
+    try:
+        if source:
+            return json.load(open(os.path.join(source, "daily", f"{m}.json")))["days"]
+        return _get(DAILY.format(m=m))["days"]
+    except Exception as e:
+        log(f"desk: {m} daily archive unavailable ({e!r})")
+        return {}
 
 
 def to_ny(bars):
@@ -497,6 +509,12 @@ def run(source=None, fresh=True, now=None, out=OUT, log=print):
     doc = {"updated": now.isoformat(timespec="minutes"), "source": "Yahoo Finance futures bars via the Displace archive",
            "bars": {"hour": round(hour_bar, 2), "pace": round(pace_bar, 2), "extreme": round(extreme_bar, 2)},
            "markets": {m: finish(m, r, hour_bar, pace_bar, extreme_bar) for m, r in raw.items()}}
+    try:
+        import lab
+        daily = {m: d for m in MARKETS if (d := load_daily(m, source, log))}
+        doc["lab"] = lab.run({m: (r["days"], r["s"], r["rows1"]) for m, r in raw.items()}, daily, now, log)
+    except Exception as e:  # the desk must still publish if the lab fails
+        log(f"desk: lab failed ({e!r})")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w") as fh:
         json.dump(doc, fh, separators=(",", ":"))
