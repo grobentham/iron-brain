@@ -24,23 +24,27 @@ def _days():
 def test_no_look_ahead():
     days, s, _ = _days()
     w = L.profiles(days)
+    ctx = L.intraday_context(days, s, w, [None] * len(days))
     rnd = random.Random(2)
     checked = 0
     for i in range(60, len(days)):
         for st in [x for x in L.STRATEGIES if x["kind"] == "intraday"]:
-            plan = st["fn"](days[i], s[i], w[i])
+            plan = st["fn"](days[i], s[i], w[i], ctx[i]) if st.get("daily") else st["fn"](days[i], s[i], w[i])
             if not plan:
                 continue
             k = plan[0]
             d, O, H, L_, C = days[i]
-            # scramble everything from the entry bar's close onward: the decision must not change
+            # scramble everything from the entry bar's close onward: the decision must not change. A resting stop
+            # order (6-field plan) is filled inside its entry bar, so its levels must come from earlier bars and
+            # the scramble starts one bar later.
+            start = k + 1 if len(plan) > 5 else k
             O2, H2, L2, C2 = O.copy(), H.copy(), L_.copy(), C.copy()
-            for j in range(k, D.SLOTS):
+            for j in range(start, D.SLOTS):
                 f = math.exp(rnd.gauss(0, 0.01))
                 if j > k:
                     O2[j] *= f
                 H2[j], L2[j], C2[j] = H2[j] * f * 1.01, L2[j] * f * 0.99, C2[j] * f
-            again = st["fn"]((d, O2, H2, L2, C2), s[i], w[i])
+            again = st["fn"]((d, O2, H2, L2, C2), s[i], w[i], ctx[i]) if st.get("daily") else st["fn"]((d, O2, H2, L2, C2), s[i], w[i])
             assert again and again[:2] == plan[:2], (st["id"], plan, again)
             checked += 1
     assert checked > 100
@@ -82,7 +86,8 @@ def test_random_walk_passes_nothing():
             daily[str(d)] = [x, x * 1.005, x * 0.995, x]
     res = L.run({m: (days, s, rows) for m in D.MARKETS}, {m: daily for m in D.MARKETS},
                 dt.datetime(2026, 1, 5, 15, tzinfo=dt.timezone.utc), log=lambda *a: None)
-    assert res["trials"] == 2 * len(L.STRATEGIES)
+    assert res["trials"] == 2 * len(L.STRATEGIES) + len(res["ensembles"])
+    assert not [e for e in res["ensembles"] if e["passed"]], "random walks pass no ensemble"
     assert not [x["id"] for x in res["strategies"] if x["passed"]]
     assert {x["verdict"] for x in res["strategies"]} <= {"no edge", "inconclusive", "promising"}
     for x in res["strategies"]:

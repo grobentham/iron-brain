@@ -94,6 +94,24 @@ of about 0.96.
 `python engine/test_lab.py` checks that rules never use future bars, that fills are conservative, and that random
 walks pass nothing.
 
+### Quant library (registered 2026-11-20)
+
+Seven intraday rules from the research a quant desk would start with, all flat at 16:00 and sized from the expected
+remaining range: opening-range breakout (and the same on active days), intraday momentum after Gao, Han, Li and Zhou
+(2018), mean reversion in volatility units, an 8-hour volatility channel breakout, the 60-day trend traded in the day
+session, and a walk-forward L2-regularised logistic regression on six volatility-scaled features. An equal-risk
+ensemble of every intraday rule the account allows is tested as one more strategy (41 tests, bar t ≥ 3.04).
+
+Breakouts fill with resting stop orders. Within the entry bar the standard path rule decides whether the stop came
+after the fill (a bar that opened nearer its high went up first). Checking only the entry bar's close was optimistic:
+it made random walks look profitable. On the 46 days with both hourly and 5-minute bars the hourly fills agree on the
+trade's direction 98% of the time but are a little generous on NQ (about 9 points a trade against 4).
+
+As of November 2026, on 2.4 years of intraday futures bars: the opening-range breakout is the strongest intraday
+result (NQ Sharpe 1.0, gold 0.8, and in the 50K Builder simulation it passes about half of evaluations against a
+quarter to a third for luck) but is inconclusive; the model and mean reversion show nothing. The long history should
+settle it.
+
 ## Signals and alerts
 
 The Signals panel at the top of the page has three tiers. **Tested** strategies passed every check and are the only

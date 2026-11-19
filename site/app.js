@@ -372,6 +372,7 @@
     $("lab-body").innerHTML = head +
       '<div class="card"><h3>' + esc(v.name) + ' strategies</h3><div class="hscroll"><table class="t lab"><thead><tr><th>Strategy</th><th class="n">Trades</th><th class="n">Win</th><th class="n">Per year</th><th class="n">Max DD</th><th class="n">t</th><th class="n">vs random</th><th class="n">Sharpe (95% range)</th><th>Verdict</th><th>50K Builder eval<br><small>at $500 risk</small></th><th>Today</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
       '<p class="fine">Dollars are per full contract (one ' + esc(v.name) + " point is $" + v.pv + ") after costs. “vs random” is the share of 200 random-timing runs of the same rule that it beat. Sharpe is annualised, with the range the result is consistent with. <b>Inconclusive</b> means the data can’t rule a worthwhile edge (Sharpe ≥ " + Lb.meaningful + ") in or out; <b>no edge</b> means it can. <b>Promising</b> holds up on every check and is significant on its own, but not after allowing for " + Lb.trials + " tests. Click a row for details.</p></div>" +
+      ensembleView(Lb, v) +
       (Lb.changes ? '<details class="paper"><summary>Method changes (' + Lb.changes.length + ")</summary><ul>" + Lb.changes.map(function (c) { return "<li><b>" + esc(c[0]) + "</b> " + esc(c[1]) + "</li>"; }).join("") + "</ul><p class=\"fine\">The rules themselves are never edited. Changes to how they’re tested were made after seeing results, so the forward record, which no change can touch, is the cleaner test.</p></details>" : "");
     Array.prototype.forEach.call($("lab-body").querySelectorAll("tr.srow"), function (tr) {
       tr.onclick = function () { var k = tr.getAttribute("data-k"); open_ = open_ === k ? "" : k; store.set("ib-lab-open", open_); labView(); };
@@ -392,6 +393,14 @@
     var lo = -1.5, hi = 2.5, sc = function (y) { return Math.max(0, Math.min(100, (y - lo) / (hi - lo) * 100)); };
     var a = sc(x.sharpeRange[0]), b = sc(x.sharpeRange[1]);
     return '<span class="ci' + (x.sharpeRange[0] > 0 ? " good" : "") + '" title="Annual Sharpe and its 95% range; the line is zero"><span class="z" style="left:' + sc(0) + '%"></span><span class="rg" style="left:' + a + "%;width:" + Math.max(2, b - a) + '%"></span><span class="pt" style="left:' + sc(x.sharpe) + '%"></span></span>';
+  }
+  function ensembleView(Lb, v) {
+    var e = (Lb.ensembles || []).filter(function (x) { return x.market === cur; })[0];
+    if (!e) return "";
+    var V = VERDICT[e.verdict] || ["fail", e.verdict];
+    return '<div class="card"><h3>All ' + esc(v.name) + " intraday rules combined</h3>" +
+      '<p class="sub">How a quant desk would run weak signals: the ' + e.members.length + " intraday rules the account allows, each scaled to the same risk, traded together as one strategy. It counts as one more test.</p>" +
+      '<table class="t"><tbody><tr><td>Sharpe (95% range)</td><td class="n">' + ci(e) + e.sharpe.toFixed(2) + " <small>" + e.sharpeRange[0].toFixed(1) + " to " + e.sharpeRange[1].toFixed(1) + '</small></td></tr><tr><td>t</td><td class="n">' + e.t.toFixed(2) + " (bar " + Lb.bar.toFixed(2) + ')</td></tr><tr><td>Beat random timing</td><td class="n">' + pc(e.beatRandom) + '</td></tr><tr><td>Verdict</td><td class="n"><span class="' + V[0] + '">' + V[1] + "</span></td></tr></tbody></table></div>";
   }
   function evalTable(x, v) {
     if (!x.tradable) return '<p><b>50K Builder:</b> not allowed. This rule holds positions overnight, and MyFundedFutures closes every position at 16:10 New York.</p>';
