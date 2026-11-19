@@ -21,6 +21,10 @@ publishes `site/data/desk.json`. The page does the live arithmetic in the browse
   daily movement still to come according to the hourly volatility profile.
 - **Touch odds:** for every hour of every past day, how far price went above and below that hour's close before
   17:00 in those units, kept separately for up and down moves.
+- **By hour:** late in the day, with a bar or two left, moves fall short of a single shared distribution. Each hour
+  can get its own (pooled with its neighbours), used only where that beats the shared version out of sample. As of
+  November 2026 it passes for NQ (worst hourly gap 16 → 5 points) but not gold, whose afternoon odds run high by up
+  to about 11 points; the page says so.
 - **Pace:** today's range so far versus what the profile expected stretches or shrinks the remaining range. It is
   used only while it beats the plain model out of sample (Diebold–Mariano t, Bonferroni across markets) in both halves.
 - **Tests:** expanding-window refits every 20 trading days, scored on the next 20. New high/low odds are compared

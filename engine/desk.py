@@ -11,6 +11,7 @@ scored on days the model had not seen.
 Tests (all walk-forward, refit every 20 days on earlier days only):
   touch     P(trading k x the expected remaining range above/below the price before 17:00), k = 1/4 .. 1
   extreme   P(the day still makes a new high / new low after this hour) vs the plain rate for that hour
+  by hour   whether each hour needs its own distribution (late in the day moves fall short of a shared one)
   pace      whether today's range so far (fast or slow day) changes those odds; used only if it passes
   hours     whether any hour of the day closes up more often than chance (Bonferroni across hours and markets)
   opening   09:30-10:00 opening range statistics from 5-minute bars (collecting until enough days exist)
@@ -47,6 +48,7 @@ BETAS = (0.0, 0.25, 0.5, 0.75, 1.0)
 GRID = np.round(np.arange(0, 5.001, 0.02), 2)
 WARM, STEP, SPAN = 150, 20, 20
 MIN_OR_DAYS = 250
+NEIGHBOURS = 1                # hours either side pooled into each hour's distribution
 
 
 # ---------- data ----------
@@ -169,10 +171,7 @@ def survival(e):
     return lambda x: (n - np.searchsorted(e, x, side="left") + 0.5) / (n + 1)
 
 
-def predict(train, test, beta):
-    """Predicted probabilities for every test checkpoint: touches at each k (up, down) and new high / new low."""
-    rt, rs = train[:, 6] ** beta, test[:, 6] ** beta
-    Su, Sd = survival(train[:, 2] / rt), survival(train[:, 3] / rt)
+def _cols(Su, Sd, test, rs):
     cols = []
     for k in KS:
         cols.append(Su(k / rs))
@@ -180,6 +179,22 @@ def predict(train, test, beta):
     cols.append(Su(test[:, 4] / rs))
     cols.append(Sd(test[:, 5] / rs))
     return np.column_stack(cols)
+
+
+def predict(train, test, beta, byhour=False):
+    """Predicted probabilities for every test checkpoint: touches at each k (up, down) and new high / new low.
+    byhour: each hour gets its own excursion distribution, pooled with the hours either side of it."""
+    rt, rs = train[:, 6] ** beta, test[:, 6] ** beta
+    if not byhour:
+        return _cols(survival(train[:, 2] / rt), survival(train[:, 3] / rt), test, rs)
+    out = np.zeros((len(test), 2 * len(KS) + 2))
+    for g in range(SLOTS - 1):
+        ms = test[:, 1] == g
+        if not ms.any():
+            continue
+        mt = np.abs(train[:, 1] - g) <= NEIGHBOURS
+        out[ms] = _cols(survival(train[mt, 2] / rt[mt]), survival(train[mt, 3] / rt[mt]), test[ms], rs[ms])
+    return out
 
 
 def outcomes(test):
@@ -203,7 +218,7 @@ def slot_rates(train, test):
     return out
 
 
-def choose_beta(train):
+def choose_beta(train, byhour=False):
     """Pace exponent chosen on the training days only, by a split inside them."""
     days_ = np.unique(train[:, 0])
     cut = days_[int(len(days_) * 0.6)]
@@ -211,7 +226,7 @@ def choose_beta(train):
     y = outcomes(b)
     best, bl = 0.0, None
     for be in BETAS:
-        loss = float(np.mean((predict(a, b, be) - y) ** 2))
+        loss = float(np.mean((predict(a, b, be, byhour) - y) ** 2))
         if bl is None or loss < bl - 1e-9:
             best, bl = be, loss
     return best
@@ -253,7 +268,7 @@ def t_needed(k, alpha=0.05):
 
 def walk_forward(days, s):
     """Expanding-window refits every STEP days; returns stacked test rows with predictions."""
-    P0, P1, Y, B, T, betas = [], [], [], [], [], []
+    P0, PH, P1, Y, B, T, betas = [], [], [], [], [], [], []
     start = max(WARM, SPAN + 30)
     for t0 in range(start, len(days), STEP):
         tr = list(range(SPAN, t0))
@@ -262,28 +277,35 @@ def walk_forward(days, s):
         train, test = checkpoints(days, s, w, tr), checkpoints(days, s, w, te)
         if not len(test):
             continue
-        be = choose_beta(train)
+        be = choose_beta(train, True)
         betas.append(be)
         P0.append(predict(train, test, 0.0))
-        P1.append(predict(train, test, be))
+        PH.append(predict(train, test, 0.0, True))
+        P1.append(predict(train, test, be, True))
         Y.append(outcomes(test))
         B.append(slot_rates(train, test))
         T.append(test)
     if not T:
         return None
-    return {"p0": np.vstack(P0), "p1": np.vstack(P1), "y": np.vstack(Y), "base": np.vstack(B), "rows": np.vstack(T),
+    return {"p0": np.vstack(P0), "ph": np.vstack(PH), "p1": np.vstack(P1), "y": np.vstack(Y), "base": np.vstack(B), "rows": np.vstack(T),
             "betas": betas}
 
 
 def evaluate(wf, days):
-    rows, y, p0, p1, base = wf["rows"], wf["y"], wf["p0"], wf["p1"], wf["base"]
+    rows, y, pooled, p0, p1, base = wf["rows"], wf["y"], wf["p0"], wf["ph"], wf["p1"], wf["base"]
     day = rows[:, 0]
     n_days = len(np.unique(day))
     half = np.median(np.unique(day))
     first = day <= half
     res = {"days": n_days, "from": str(days[int(day.min())][0]), "to": str(days[int(day.max())][0]),
            "checkpoints": int(len(rows))}
-    # touch calibration (pace-free model)
+    # does giving each hour its own distribution beat one shared distribution?
+    la, lb = np.mean((p0 - y) ** 2, axis=1), np.mean((pooled - y) ** 2, axis=1)
+    res["byHour"] = {"skill": round(float(1 - la.sum() / lb.sum()), 4), "t": round(dm(day, la, lb), 2),
+                     "halves": [round(float(1 - la[first].sum() / lb[first].sum()), 4),
+                                round(float(1 - la[~first].sum() / lb[~first].sum()), 4)],
+                     "worstHourGap": worst_gap(rows, pooled, y), "worstHourGapByHour": worst_gap(rows, p0, y)}
+    # touch calibration (hour-by-hour model, before pace)
     tc = slice(0, 2 * len(KS))
     pt, yt = p0[:, tc].ravel(), y[:, tc].ravel()
     res["touch"] = {
@@ -313,6 +335,17 @@ def evaluate(wf, days):
     res["pace"] = {"skill": round(float(sk), 4), "t": round(dm(day, la, lb), 2), "halves": [round(float(s1), 4),
                    round(float(s2), 4)], "betas": sorted(set(wf["betas"]))}
     return res
+
+
+def worst_gap(rows, p, y):
+    """Largest gap, in points of probability, between predicted and actual touch rates at any hour (k = 1/2)."""
+    j = 2 * KS.index(0.5)
+    g = 0.0
+    for i in range(SLOTS - 1):
+        m = rows[:, 1] == i
+        if m.any():
+            g = max(g, abs(p[m, j].mean() - y[m, j].mean()), abs(p[m, j + 1].mean() - y[m, j + 1].mean()))
+    return round(float(g), 3)
 
 
 def hour_tests(days, bar):
@@ -408,27 +441,36 @@ def run_market(m, source=None, fresh=True, now=None, log=print):
     idx = list(range(SPAN, len(days)))
     w = profile(days, idx)
     allrows = checkpoints(days, s, w, idx)
-    beta_live = choose_beta(allrows)
+    beta_live = choose_beta(allrows, True)
     return {"days": days, "R": R, "s": s, "w": w, "rows": allrows, "beta_live": beta_live, "eval": ev,
             "rows1": rows1, "rows5": rows5, "now": now}
 
 
 def finish(m, r, hour_bar, pace_bar, extreme_bar):
     ev, days, rows = r["eval"], r["days"], r["rows"]
+    bh = ev["byHour"]
+    bh["passed"] = bool(bh["t"] >= pace_bar and min(bh["halves"]) > 0)
     pace = ev["pace"]
     pace["passed"] = bool(pace["t"] >= pace_bar and min(pace["halves"]) > 0)
     for e in ev["extreme"]:
         e["passed"] = bool(e["t"] >= extreme_bar and min(e["halves"]) > 0)
     beta = r["beta_live"] if pace["passed"] else 0.0
     rt = rows[:, 6] ** beta
-    Su, Sd = survival(rows[:, 2] / rt), survival(rows[:, 3] / rt)
+
+    def tables(mask):
+        Su, Sd = survival(rows[mask, 2] / rt[mask]), survival(rows[mask, 3] / rt[mask])
+        return [round(float(x), 4) for x in Su(GRID)], [round(float(x), 4) for x in Sd(GRID)]
+    if bh["passed"]:
+        t = [tables(np.abs(rows[:, 1] - g) <= NEIGHBOURS) for g in range(SLOTS - 1)]
+        surv_up, surv_dn = [a for a, _ in t], [b for _, b in t]
+    else:
+        surv_up, surv_dn = tables(np.ones(len(rows), bool))
     meta = MARKETS[m]
     return {
         "name": meta["name"], "full": meta["full"], "tick": meta["tick"], "pv": meta["pv"], "micro": meta["micro"],
         "dp": meta["dp"],
         "profile": [round(float(x), 5) for x in r["w"]], "hours": SLOT_HOURS,
-        "beta": beta, "grid": GRID.tolist(),
-        "survUp": [round(float(x), 4) for x in Su(GRID)], "survDn": [round(float(x), 4) for x in Sd(GRID)],
+        "beta": beta, "grid": GRID.tolist(), "byHour": bh["passed"], "survUp": surv_up, "survDn": surv_dn,
         "tests": ev, "hourly": hour_tests(days[SPAN:], hour_bar),
         "opening": opening_range(r["rows5"]),
         "today": today_state(days, r["s"], r["R"], r["rows1"], r["rows5"], r["now"]),
@@ -461,7 +503,8 @@ def run(source=None, fresh=True, now=None, out=OUT, log=print):
     for m, v in doc["markets"].items():
         t = v["tests"]
         log(f"desk: {m} {t['days']} test days; touch brier {t['touch']['brier']}; extreme skill "
-            f"{t['extreme'][0]['skill']}/{t['extreme'][1]['skill']}; pace {t['pace']['skill']} (t {t['pace']['t']}, "
+            f"{t['extreme'][0]['skill']}/{t['extreme'][1]['skill']}; by hour {t['byHour']['skill']} (t {t['byHour']['t']}, worst gap "
+            f"{t['byHour']['worstHourGap']} -> {t['byHour']['worstHourGapByHour']}); pace {t['pace']['skill']} (t {t['pace']['t']}, "
             f"{'used' if v['beta'] else 'not used'}); hours passed "
             f"{[h['hour'] for h in v['hourly'] if h['passed']]}; opening {v['opening']['days']} days")
     log(f"desk: {n} markets in {time.time() - t0:.1f}s")
