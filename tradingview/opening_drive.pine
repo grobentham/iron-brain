@@ -1,0 +1,190 @@
+//@version=6
+// Iron Brain · Opening drive (NQ / MNQ). Indicator with alerts. Not advice.
+// Rules, New York time, exactly as Iron Brain's lab tests them:
+//   1. Measure the 09:00-10:00 hour, from its open to its close.
+//   2. It must move at least 0.25x a normal day's range. A normal day's range is an EWMA (span 20) of the daily
+//      high-low range in log terms, from the 18:00 open to the close, known before the day starts.
+//   3. Enter at 10:00 in the direction of that move.
+//   4. Stop: half the range NQ normally still covers from 10:00 to 16:00 (sqrt of that window's share of the
+//      day's volatility, times the normal range), on the other side of the entry.
+//   5. No target. Flat at 16:00. At most one trade a day.
+// Tested on NQ 2018-2026: 508 trades, 52% wins, profit factor 1.6, Sharpe 1.37 after costs. It does not work on gold.
+// Use a 1-, 5-, 15-, 30- or 60-minute chart (any timeframe that divides the hour). The history panel counts trades on the bars loaded, before costs.
+indicator("Iron Brain · Opening drive", shorttitle = "IB Drive", overlay = true, max_labels_count = 500)
+
+// ---------- inputs ----------
+float thrMult   = input.float(0.25, "Minimum 09:00-10:00 move (x normal day range)", minval = 0.05, step = 0.05)
+float stopMult  = input.float(0.5, "Stop (x remaining range)", minval = 0.1, step = 0.05)
+float riskUsd   = input.float(500, "Risk per trade ($)", minval = 1, step = 50)
+int   maxQty    = input.int(40, "Max contracts (40 micros or 4 minis)", minval = 1)
+float shareIn   = input.float(0.50, "10:00-16:00 share of daily volatility (used until 60 days are loaded)", minval = 0.1, maxval = 0.9, step = 0.01)
+bool  showStats = input.bool(true, "Show panel")
+
+if not timeframe.isintraday or timeframe.in_seconds() > 3600 or 3600 % timeframe.in_seconds() != 0
+    runtime.error("Use a chart that divides the hour: 1, 2, 3, 5, 10, 15, 20, 30 or 60 minutes.")
+
+string TZ   = "America/New_York"
+int    SPAN = 20
+float  A    = 2.0 / (SPAN + 1)
+
+// ---------- New York clock; the trading day starts at 18:00 ----------
+int  H        = hour(time, TZ)
+int  openMin  = H * 60 + minute(time, TZ)
+int  closeMin = hour(time_close, TZ) * 60 + minute(time_close, TZ)
+int  shifted  = time + 6 * 3600000
+int  tdKey    = year(shifted, TZ) * 10000 + month(shifted, TZ) * 100 + dayofmonth(shifted, TZ)
+bool newDay   = tdKey != nz(tdKey[1])
+
+// ---------- normal day range: EWMA of the daily log range ----------
+var float dHi  = na
+var float dLo  = na
+var float s    = na
+var int   days = 0
+var array<float> first = array.new<float>()
+if newDay and not na(dHi) and dLo > 0
+    float R = math.log(dHi / dLo)
+    days += 1
+    if na(s)
+        array.push(first, R * R)
+        if array.size(first) == SPAN
+            s := math.sqrt(array.avg(first))
+    else
+        s := math.sqrt(A * R * R + (1 - A) * s * s)
+if newDay
+    dHi := high
+    dLo := low
+else
+    dHi := math.max(dHi, high)
+    dLo := math.min(dLo, low)
+
+// ---------- volatility profile: squared hourly log ranges by New York hour ----------
+var array<float> acc = array.new<float>(24, 0.0)
+var int   curH = -1
+var float hHi  = na
+var float hLo  = na
+if H != curH
+    if curH >= 0 and not na(hHi) and hLo > 0
+        float v = math.log(hHi / hLo)
+        array.set(acc, curH, array.get(acc, curH) + v * v)
+    curH := H
+    hHi  := high
+    hLo  := low
+else
+    hHi := math.max(hHi, high)
+    hLo := math.min(hLo, low)
+float tot = array.sum(acc)
+float win = 0.0
+for k = 10 to 15
+    win += array.get(acc, k)
+float share = days >= 60 and tot > 0 ? win / tot : shareIn
+
+// ---------- today's trade ----------
+var float sDay    = na
+var float o9      = na
+var int   dir     = 0
+var float entry   = na
+var float stop    = na
+var int   qty     = 0
+var bool  live    = false
+var bool  decided = false
+var string status = "Waiting for 09:00"
+
+// history
+var int   nTr   = 0
+var int   nWin  = 0
+var float sumPts = 0.0
+var float sumR   = 0.0
+
+if newDay
+    sDay    := s
+    o9      := na
+    dir     := 0
+    entry   := na
+    stop    := na
+    qty     := 0
+    live    := false
+    decided := false
+    status  := "Waiting for 09:00"
+
+if openMin >= 9 * 60 and openMin < 10 * 60 and na(o9)
+    o9 := open
+
+float thrLog = na(sDay) ? na : thrMult * sDay
+bool  longSig  = false
+bool  shortSig = false
+
+// decide at the close of the bar that ends at 10:00
+if not decided and closeMin == 10 * 60 and not na(o9) and not na(sDay)
+    decided := true
+    float m = math.log(close / o9)
+    if math.abs(m) >= thrLog
+        dir   := m > 0 ? 1 : -1
+        entry := close
+        float rem = math.sqrt(share) * sDay
+        stop  := entry * math.exp(-dir * stopMult * rem)
+        float riskPts = math.abs(entry - stop)
+        qty   := int(math.min(maxQty, math.floor(riskUsd / (riskPts * syminfo.pointvalue))))
+        live  := true
+        longSig  := dir > 0
+        shortSig := dir < 0
+        status := (dir > 0 ? "LONG" : "SHORT") + " from " + str.tostring(entry, format.mintick)
+        label.new(bar_index, dir > 0 ? low : high, (dir > 0 ? "Drive LONG" : "Drive SHORT") + "\nStop " + str.tostring(stop, format.mintick) +
+             "\n" + str.tostring(qty) + " contracts", style = dir > 0 ? label.style_label_up : label.style_label_down,
+             color = dir > 0 ? color.new(#1e8a5a, 0) : color.new(#c23b3b, 0), textcolor = color.white, size = size.small)
+        alert(syminfo.ticker + " opening drive " + (dir > 0 ? "LONG" : "SHORT") + " at about " + str.tostring(entry, format.mintick) +
+             ", stop " + str.tostring(stop, format.mintick) + ", " + str.tostring(qty) + " contracts at $" + str.tostring(riskUsd) +
+             " risk, flat 16:00 NY", alert.freq_once_per_bar_close)
+    else
+        status := "No trade: the 09:00 hour moved " + str.tostring(math.abs(close - o9), format.mintick) + " pts, needed " +
+             str.tostring(o9 * (math.exp(thrLog) - 1), format.mintick)
+
+// manage the open trade: stop first, then the 16:00 exit
+float result = na
+if live and openMin >= 10 * 60
+    bool stopped = dir > 0 ? low <= stop : high >= stop
+    if stopped
+        result := dir > 0 ? math.min(stop, open) - entry : entry - math.max(stop, open)
+        status := "Stopped: " + str.tostring(result, format.mintick) + " pts"
+    else if closeMin >= 16 * 60 or openMin >= 16 * 60
+        result := dir * (close - entry)
+        status := "Closed at 16:00: " + (result >= 0 ? "+" : "") + str.tostring(result, format.mintick) + " pts"
+    if not na(result)
+        live := false
+        nTr  += 1
+        nWin += result > 0 ? 1 : 0
+        sumPts += result
+        sumR   += result / math.abs(entry - stop)
+        label.new(bar_index, dir > 0 ? high : low, (result >= 0 ? "+" : "") + str.tostring(result, format.mintick),
+             style = label.style_label_left, color = color.new(color.gray, 70), textcolor = result >= 0 ? #1e8a5a : #c23b3b, size = size.tiny)
+
+// ---------- drawing ----------
+bool showTrade = live or not na(result)
+plot(showTrade ? entry : na, "Entry", color = color.new(color.blue, 0), style = plot.style_linebr, linewidth = 2)
+plot(showTrade ? stop : na, "Stop", color = color.new(#c23b3b, 0), style = plot.style_linebr, linewidth = 2)
+bgcolor(openMin >= 9 * 60 and openMin < 10 * 60 ? color.new(#e9a20c, 88) : na, title = "09:00-10:00 hour")
+// the levels the 09:00 hour has to reach
+bool inHour = openMin >= 9 * 60 and openMin < 10 * 60 and not na(o9) and not na(thrLog)
+plot(inHour ? o9 * math.exp(thrLog) : na, "Long trigger (10:00 close above)", color = color.new(#1e8a5a, 40), style = plot.style_linebr)
+plot(inHour ? o9 * math.exp(-thrLog) : na, "Short trigger (10:00 close below)", color = color.new(#c23b3b, 40), style = plot.style_linebr)
+
+alertcondition(longSig, "Opening drive LONG", "Opening drive LONG at 10:00 New York")
+alertcondition(shortSig, "Opening drive SHORT", "Opening drive SHORT at 10:00 New York")
+
+// ---------- panel ----------
+var table tbl = table.new(position.top_right, 2, 7, bgcolor = color.new(color.white, 10), border_width = 1, border_color = color.new(color.gray, 70))
+if showStats and barstate.islast
+    float rngPts = na(s) ? na : close * (math.exp(s) - 1)
+    table.cell(tbl, 0, 0, "IB Opening drive", text_color = color.black, text_size = size.small)
+    table.cell(tbl, 1, 0, status, text_color = color.black, text_size = size.small)
+    table.cell(tbl, 0, 1, "Normal day range", text_size = size.small)
+    table.cell(tbl, 1, 1, na(rngPts) ? "warming up (" + str.tostring(array.size(first)) + "/20 days)" : str.tostring(rngPts, format.mintick) + " pts", text_size = size.small)
+    table.cell(tbl, 0, 2, "Needed 09:00 move", text_size = size.small)
+    table.cell(tbl, 1, 2, na(rngPts) ? "-" : str.tostring(close * (math.exp(thrMult * s) - 1), format.mintick) + " pts", text_size = size.small)
+    table.cell(tbl, 0, 3, "Stop distance", text_size = size.small)
+    table.cell(tbl, 1, 3, na(rngPts) ? "-" : str.tostring(close * (math.exp(stopMult * math.sqrt(share) * s) - 1), format.mintick) + " pts", text_size = size.small)
+    table.cell(tbl, 0, 4, "Today", text_size = size.small)
+    table.cell(tbl, 1, 4, live ? str.tostring(qty) + " contracts, stop " + str.tostring(stop, format.mintick) : "-", text_size = size.small)
+    table.cell(tbl, 0, 5, "Trades on chart", text_size = size.small)
+    table.cell(tbl, 1, 5, str.tostring(nTr) + (nTr > 0 ? " · " + str.tostring(100.0 * nWin / nTr, "#") + "% wins" : ""), text_size = size.small)
+    table.cell(tbl, 0, 6, "Total, before costs", text_size = size.small)
+    table.cell(tbl, 1, 6, str.tostring(sumPts, format.mintick) + " pts · " + str.tostring(sumR, "#.#") + " R", text_size = size.small)
