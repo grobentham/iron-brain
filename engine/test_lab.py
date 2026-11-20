@@ -151,10 +151,45 @@ def test_alerts_only_for_new_signals():
     assert "place orders" in t2 and "Buy stop 2" in b2
 
 
+def test_nine_oclock_orders_live():
+    """The prior-day and volatility breakouts give their stop orders once the 08:00 bar is final (about 09:12)."""
+    import datetime as dt_
+    days, s, rows = _days()
+    w = L.profiles(days)[-1]
+    d = days[-1][0]
+    prev = days[-2]
+    at = lambda h, m: dt_.datetime.combine(d, dt_.time(h, m), D.NY)
+    for sid in ("prior-day-breakout", "vol-breakout"):
+        st = [x for x in L.STRATEGIES if x["id"] == sid][0]
+        ctx = {"market": "nq", "prevHigh": float(prev[2].max()), "prevLow": float(prev[3].min())}
+        o = L.live_intraday(st, rows, s[-1], w, at(9, 20), ctx)
+        assert o["state"] in ("orders", "none", "waiting"), o
+        if o["state"] == "orders":
+            assert o["buyStop"] > o["stopLong"] > o["sellStop"] and o["stopLong"] == o["stopShort"], o
+        assert L.live_intraday(st, rows, s[-1], w, at(9, 5), ctx)["state"] == "waiting"
+
+
+def test_bar_crossing_both_sides_is_a_loss():
+    """A bar that crosses both breakout levels fills the first side and stops on the other: a full loss, never a skip."""
+    n = D.SLOTS
+    O = np.full(n, 100.0); H = np.full(n, 100.5); Lw = np.full(n, 99.5); C = np.full(n, 100.0)
+    k9 = L.slot(9)
+    H[k9], Lw[k9] = 101.0, 99.0                      # the 09:00-10:00 range
+    k = L.slot(10)
+    O[k], H[k], Lw[k], C[k] = 100.0, 102.0, 98.0, 100.0   # crosses both sides
+    day = (None, O, H, Lw, C)
+    plan = L.q_orb_v2(day, 0.01, np.full(n, 1 / n))
+    assert plan is not None and plan[0] == k, plan
+    e, x, why, _ = L.simulate(day, plan)
+    assert why == "stop" and plan[1] * (x - e) <= -(101.0 - 99.0) + 1e-9, (e, x, why)
+
+
 if __name__ == "__main__":
     test_alerts_only_for_new_signals()
     test_lab_finds_a_planted_edge()
     test_breakout_orders_live()
+    test_nine_oclock_orders_live()
+    test_bar_crossing_both_sides_is_a_loss()
     test_fills_are_conservative()
     test_no_look_ahead()
     test_daily_rules_use_only_past_closes()

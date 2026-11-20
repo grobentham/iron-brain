@@ -59,6 +59,15 @@ CHANGES = [
     ["2026-11-20", "Fitted to MyFundedFutures 50K Builder: every intraday rule is flat at the 16:00 bar close (the "
                    "account is flattened at 16:10); rules that hold overnight are research only. Registered two "
                    "account-safe day-session versions of the daily trend filter and turn of the month (26 tests)."],
+    ["2026-11-20", "Fill fix: when one hourly bar crossed both sides of a breakout's range, the day was skipped. A "
+                   "real trader is filled on the first side and stopped on the other, a full loss, so such days now "
+                   "count that way (about 9% of NQ days). Every breakout result fell: NQ breakout v2's holdout Sharpe "
+                   "went from 2.26 to 0.99, gold breakout v2 to 0.11. Rerun with the fix, the mutation search no "
+                   "longer prefers v2 to the original breakout; v2 stays registered and is judged like any rule."],
+    ["2026-11-20", "Registered the prior-day range breakout and the Williams volatility breakout (k = 0.3), the two "
+                   "that passed a discovery search of 20 literature rules per market (engine/discover.py: discovery "
+                   "on NQ to 2022 and gold to 2019; 5 of 40 advanced; both passed the later data at t 2.82 against a "
+                   "bar of 2.33, NQ only). Both also run on gold, where they did not advance."],
 ]
 ND = NormalDist()
 
@@ -171,12 +180,24 @@ def i_month_turn_day(day, s, w, ctx=None):
     return 0, 1, day[1][0] * math.exp(-rem), None, D.LAST
 
 
+def first_side(O, H, L, j, hi, lo, allow=(1, -1)):
+    """Which resting stop order bar j fills: (up, down). When the bar crosses both levels, the first one filled is
+    decided by the path rule (a bar that opened nearer its high went up first); the protective stop then sits on the
+    other side, which the same bar also reached, so such a day is a full loss. (Until 2026-11-20 these days were
+    skipped, which made every breakout look far better than it was.)"""
+    up, dn = H[j] > hi and 1 in allow, L[j] < lo and -1 in allow
+    if up and dn:
+        up_first = (H[j] - O[j]) <= (O[j] - L[j])
+        return up_first, not up_first
+    return up, dn
+
+
 # ---------- quant library, registered 2026-11-20 ----------
 # All flat at the 16:00 bar close; stops scale with the expected remaining range, so size scales with volatility.
 
 def q_orb(day, s, w, ctx=None, pace_min=None):
     """Opening-range breakout: the 09:00-10:00 bar's high and low are the range. From 10:00 to 16:00, a stop order
-    above the high buys and one below the low sells (whichever trades first; a bar that crosses both is skipped).
+    above the high buys and one below the low sells (whichever trades first; when one bar crosses both, the first is filled and stopped out).
     Stop at the middle of the range, flat at 16:00."""
     k0 = slot(10)
     _, O, H, L, C = day
@@ -189,9 +210,7 @@ def q_orb(day, s, w, ctx=None, pace_min=None):
             return None
     mid = (hi + lo) / 2
     for j in range(k0, slot(15) + 1):
-        up, dn = H[j] > hi, L[j] < lo
-        if up and dn:
-            return None
+        up, dn = first_side(O, H, L, j, hi, lo)
         if up:
             return j, 1, mid, None, D.LAST, hi
         if dn:
@@ -215,9 +234,7 @@ def q_orb_v2(day, s, w, ctx=None):
         return None
     exit_slot = slot(p["exit"] - 1)
     for j in range(k0, slot(p["lastEntry"]) + 1):
-        up, dn = H[j] > hi, L[j] < lo
-        if up and dn:
-            return None
+        up, dn = first_side(O, H, L, j, hi, lo)
         if up:
             return j, 1, lo, None, exit_slot, hi
         if dn:
@@ -317,6 +334,66 @@ def q_trend_session(day, s, w, ctx=None):
     d = ctx["mom60"]
     rem = math.sqrt(max(1e-9, w[k:D.LAST + 1].sum())) * s
     return k, d, day[1][k] * math.exp(-d * 0.5 * rem), None, D.LAST
+
+
+# ---------- registered 2026-11-20 after the discovery search (engine/discover.py) ----------
+# Both were found on NQ data to 2022 and confirmed on 2023 onwards, which the search never saw.
+
+def _levels_break(day, hi, lo, stop_at, first, last):
+    _, O, H, L, C = day
+    for j in range(first, last + 1):
+        up, dn = first_side(O, H, L, j, hi, lo)
+        if up:
+            return j, 1, stop_at, None, D.LAST, hi
+        if dn:
+            return j, -1, stop_at, None, D.LAST, lo
+    return None
+
+
+def q_prior_day_breakout(day, s, w, ctx=None):
+    """Prior-day range breakout: when 09:00 opens inside the prior trading day's full range (18:00-17:00), a stop
+    order at that day's high buys and one at its low sells, accepted 09:00-14:00 (whichever trades first); stop at
+    the 09:00 open, flat at 16:00."""
+    if not ctx or ctx.get("prevHigh") is None:
+        return None
+    hi, lo, o9 = ctx["prevHigh"], ctx["prevLow"], day[1][slot(9)]
+    if not lo < o9 < hi:
+        return None
+    return _levels_break(day, hi, lo, o9, slot(9), slot(13))
+
+
+def q_vol_breakout(day, s, w, ctx=None):
+    """Volatility breakout (Larry Williams): stop orders at the 09:00 open plus and minus 0.3 times the prior
+    trading day's full range, accepted 09:00-15:00 (whichever trades first); stop at the 09:00 open, flat at
+    16:00."""
+    if not ctx or ctx.get("prevHigh") is None:
+        return None
+    o9 = day[1][slot(9)]
+    k = 0.3 * (ctx["prevHigh"] - ctx["prevLow"])
+    if not k > 0:
+        return None
+    return _levels_break(day, o9 + k, o9 - k, o9, slot(9), slot(14))
+
+
+def _orders_at_nine(hi, lo, o9, last_entry):
+    if not (np.isfinite(hi) and np.isfinite(lo) and hi > o9 > lo):
+        return None
+    return {"buyStop": round(float(hi), 2), "sellStop": round(float(lo), 2), "stopLong": round(float(o9), 2),
+            "stopShort": round(float(o9), 2), "cancelAt": "%02d:00" % (last_entry + 1),
+            "lastEntrySlot": slot(last_entry), "exitBy": "16:00"}
+
+
+def b_prior_day_breakout(day, s, w, ctx=None):
+    if not ctx or ctx.get("prevHigh") is None:
+        return None
+    return _orders_at_nine(ctx["prevHigh"], ctx["prevLow"], day[1][slot(9)], 13)
+
+
+def b_vol_breakout(day, s, w, ctx=None):
+    if not ctx or ctx.get("prevHigh") is None:
+        return None
+    o9, k = day[1][slot(9)], 0.3 * (ctx["prevHigh"] - ctx["prevLow"])
+    return _orders_at_nine(o9 + k, o9 - k, o9, 14)
 
 
 def q_model(day, s, w, ctx=None):
@@ -480,6 +557,10 @@ STRATEGIES = [
      "daily": True, "registered": "2026-11-20", "family": "quant"},
     {"id": "trend-session", "name": "Trend, day session (60-day)", "kind": "intraday", "fn": q_trend_session,
      "daily": True, "registered": "2026-11-20", "family": "quant"},
+    {"id": "prior-day-breakout", "name": "Prior-day range breakout", "kind": "intraday", "fn": q_prior_day_breakout,
+     "bracket": b_prior_day_breakout, "ordersFrom": 9, "daily": True, "registered": "2026-11-20", "family": "quant"},
+    {"id": "vol-breakout", "name": "Volatility breakout (Williams)", "kind": "intraday", "fn": q_vol_breakout,
+     "bracket": b_vol_breakout, "ordersFrom": 9, "daily": True, "registered": "2026-11-20", "family": "quant"},
     {"id": "model", "name": "Model: walk-forward logistic regression", "kind": "intraday", "fn": q_model,
      "daily": True, "registered": "2026-11-20", "family": "quant"},
     {"id": "momentum-20", "name": "20-day momentum", "kind": "daily", "fn": d_momentum},
@@ -576,6 +657,7 @@ def intraday_context(days, s, w, ctx):
         c = dict(c or {})
         if i > 0 and (days[i][0] - days[i - 1][0]).days <= 4:
             c["prevClose"] = float(days[i - 1][4][D.LAST])
+            c["prevHigh"], c["prevLow"] = float(days[i - 1][2].max()), float(days[i - 1][3].min())
         c["pUp"] = preds[i]
         out.append(c)
     return out
@@ -759,7 +841,7 @@ def live_intraday(st, rows1, s_today, w, now, ctx_today=None):
         return {"state": "signal", "day": str(key), "dir": "LONG" if d > 0 else "SHORT", "entry": round(float(entry), 2),
                 "stop": round(float(stop), 2), "target": round(float(target), 2) if target is not None else None,
                 "at": "%02d:00" % D.SLOT_HOURS[k], "exitBy": "%02d:00 New York" % ((D.SLOT_HOURS[end] + 1) % 24)}
-    if st.get("bracket") and done >= slot(10):
+    if st.get("bracket") and done >= slot(st.get("ordersFrom", 10)):
         with np.errstate(invalid="ignore", divide="ignore"):
             try:
                 b = st["bracket"](fill, s_today, w, ctx_today)
@@ -769,7 +851,9 @@ def live_intraday(st, rows1, s_today, w, now, ctx_today=None):
             b = {k: v for k, v in b.items() if k != "lastEntrySlot"}
             return {"state": "orders", "day": str(key), **b,
                     "note": "Place both stop orders now (one cancels the other); cancel if unfilled by %s New York."
-                            % b["cancelAt"]}
+                            % b["cancelAt"]
+                            + (" Levels use the 08:00 close until the 09:00 bar is in." if st.get("ordersFrom") == 9
+                               and done == slot(9) else "")}
         if b is None and st["id"] == "orb-active":
             return {"state": "none", "day": str(key), "note": "Not an active day: no trade today."}
     if done > last:
@@ -812,7 +896,8 @@ def live_model(days, s, w, rows1, now, prev):
 def _decision_slot(st):
     return {"orb": slot(15), "orb-v2": slot(11), "orb-active": slot(15), "intraday-momentum": slot(15), "mean-reversion": slot(14),
             "channel-breakout": slot(14), "trend-session": slot(10), "model": slot(10),"exhaustion": slot(14), "opening-drive": slot(10), "overnight-fade": slot(9), "overnight-long": 0,
-            "late-momentum": slot(15), "fast-trend": slot(12), "trend-day": 0, "month-turn-day": 0}[st["id"]]
+            "late-momentum": slot(15), "fast-trend": slot(12), "trend-day": 0, "month-turn-day": 0,
+            "prior-day-breakout": slot(13), "vol-breakout": slot(14)}[st["id"]]
 
 
 def _last_weekday(y, m):
@@ -982,6 +1067,7 @@ def run(intraday_data, daily_data, now, log=print, seed=7):
                 ctx_today = dict(daily_context([(dt.date.fromisoformat(key),)], *dd)[0] or {})
                 if days and str(days[-1][0]) < key:
                     ctx_today["prevClose"] = float(days[-1][4][D.LAST])
+                    ctx_today["prevHigh"], ctx_today["prevLow"] = float(days[-1][2].max()), float(days[-1][3].min())
                 ctx_today["pUp"] = live_model(days, s, w, rows1, now, ctx_today.get("prevClose"))
             ctx_today = dict(ctx_today or {}, market=m)
             for st in [x for x in STRATEGIES if x["kind"] == "intraday"]:

@@ -1,5 +1,6 @@
 //@version=6
 // Iron Brain · Opening-range breakout v2 (tested on NQ and gold, fitted to a MyFundedFutures 50K Builder)
+// Default is v1: with correct fills (a bar crossing both sides is a full loss) v1 tested better than v2.
 // Rules, all New York time:
 //   1. The 09:00-10:00 high and low are the opening range.
 //   2. From 10:00, a buy stop one tick above the high and a sell stop one tick below the low; one cancels the other.
@@ -16,7 +17,7 @@ strategy("Iron Brain · Opening-range breakout v2", shorttitle = "IB ORB v2", ov
 
 // ---------- inputs ----------
 string TZ      = "America/New_York"
-string version = input.string("v2", "Version", options = ["v2", "v1 (original)"])
+string version = input.string("v1 (original)", "Version", options = ["v2", "v1 (original)"])
 float  riskUsd = input.float(500, "Risk per trade ($)", minval = 1, step = 50)
 int    maxQty  = input.int(40, "Max contracts (40 micros or 4 minis)", minval = 1)
 int    tickPad = input.int(1, "Ticks beyond the range for the stop orders", minval = 0)
