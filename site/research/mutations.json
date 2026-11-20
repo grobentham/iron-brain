@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-20T02:43+00:00",
+ "generated": "2026-11-20T06:49+00:00",
  "grid": {
   "range": [
    1,
@@ -59,73 +59,73 @@
     "2026-11-19"
    ],
    "base": {
-    "rule": "Opening range 09:00-10:00; breakout either side until the 15:00 bar; stop at the middle of the range; flat at 16:00.",
+    "rule": "Opening range 09:00-10:00; breakout either side accepted until 16:00; stop at the middle of the range; flat at 16:00.",
     "discovery": {
-     "sharpe": 1.788,
-     "t": 3.85,
-     "trades": 1045,
-     "bpPerDay": 7.979,
+     "sharpe": 1.154,
+     "t": 2.49,
+     "trades": 1137,
+     "bpPerDay": 5.227,
      "halves": [
-      1894.4,
-      7441.5
+      748.9,
+      5367.0
      ]
     },
     "holdout": {
-     "sharpe": 1.769,
-     "t": 3.42,
-     "trades": 831,
-     "bpPerDay": 6.346,
+     "sharpe": 0.956,
+     "t": 1.85,
+     "trades": 931,
+     "bpPerDay": 3.491,
      "halves": [
-      4891.1,
-      1086.9
+      3500.2,
+      -212.0
      ]
     }
    },
    "discoverySharpe": {
-    "best": 1.84,
-    "median": 0.78,
-    "share_positive": 0.933
+    "best": 1.45,
+    "median": 0.68,
+    "share_positive": 0.908
    },
    "top": [
     {
      "variant": {
-      "range": 1,
-      "lastEntry": 13,
+      "range": 2,
+      "lastEntry": 15,
       "stop": "mid",
       "target": null,
       "exit": 16,
-      "filter": "none",
+      "filter": "gap",
       "side": "both"
      },
-     "rule": "Opening range 09:00-10:00; breakout either side until the 13:00 bar; stop at the middle of the range; flat at 16:00.",
+     "rule": "Opening range 09:00-11:00; breakout either side accepted until 16:00; stop at the middle of the range; flat at 16:00. Only in the direction of the move from the prior 16:00 close.",
      "discovery": {
-      "sharpe": 1.752,
-      "t": 3.78,
-      "trades": 1037,
-      "bpPerDay": 7.816,
+      "sharpe": 1.45,
+      "t": 3.12,
+      "trades": 691,
+      "bpPerDay": 5.101,
       "halves": [
-       1837.8,
-       7306.8
+       2839.1,
+       3129.0
       ]
      },
-     "plateau": 1.441,
+     "plateau": 1.225,
      "holdout": {
-      "sharpe": 1.781,
-      "t": 3.44,
-      "trades": 826,
-      "bpPerDay": 6.374,
+      "sharpe": -0.172,
+      "t": -0.33,
+      "trades": 564,
+      "bpPerDay": -0.459,
       "halves": [
-       4826.2,
-       1178.0
+       331.4,
+       -763.5
       ]
      },
-     "tVsBase": 0.23,
-     "passed": true,
+     "tVsBase": -2.22,
+     "passed": false,
      "better": false
     },
     {
      "variant": {
-      "range": 1,
+      "range": 2,
       "lastEntry": 15,
       "stop": "mid",
       "target": null,
@@ -133,35 +133,107 @@
       "filter": "none",
       "side": "both"
      },
-     "rule": "Opening range 09:00-10:00; breakout either side until the 15:00 bar; stop at the middle of the range; flat at 16:00.",
+     "rule": "Opening range 09:00-11:00; breakout either side accepted until 16:00; stop at the middle of the range; flat at 16:00.",
      "discovery": {
-      "sharpe": 1.788,
-      "t": 3.85,
-      "trades": 1045,
-      "bpPerDay": 7.979,
+      "sharpe": 1.399,
+      "t": 3.01,
+      "trades": 1006,
+      "bpPerDay": 5.87,
       "halves": [
-       1894.4,
-       7441.5
+       2551.2,
+       4316.4
       ]
      },
-     "plateau": 1.409,
+     "plateau": 1.185,
      "holdout": {
-      "sharpe": 1.769,
-      "t": 3.42,
-      "trades": 831,
-      "bpPerDay": 6.346,
+      "sharpe": 0.097,
+      "t": 0.19,
+      "trades": 819,
+      "bpPerDay": 0.385,
       "halves": [
-       4891.1,
-       1086.9
+       -96.9,
+       459.6
       ]
      },
-     "tVsBase": 0.0,
-     "passed": true,
+     "tVsBase": -1.4,
+     "passed": false,
      "better": false
     },
     {
      "variant": {
-      "range": 1,
+      "range": 2,
+      "lastEntry": 15,
+      "stop": "mid",
+      "target": 2.0,
+      "exit": 16,
+      "filter": "none",
+      "side": "both"
+     },
+     "rule": "Opening range 09:00-11:00; breakout either side accepted until 16:00; stop at the middle of the range, target 2R; flat at 16:00.",
+     "discovery": {
+      "sharpe": 1.365,
+      "t": 2.94,
+      "trades": 1006,
+      "bpPerDay": 5.251,
+      "halves": [
+       1725.6,
+       4418.6
+      ]
+     },
+     "plateau": 1.177,
+     "holdout": {
+      "sharpe": -0.396,
+      "t": -0.76,
+      "trades": 819,
+      "bpPerDay": -1.205,
+      "halves": [
+       -990.9,
+       -144.1
+      ]
+     },
+     "tVsBase": -2.62,
+     "passed": false,
+     "better": false
+    },
+    {
+     "variant": {
+      "range": 2,
+      "lastEntry": 13,
+      "stop": "mid",
+      "target": null,
+      "exit": 16,
+      "filter": "none",
+      "side": "both"
+     },
+     "rule": "Opening range 09:00-11:00; breakout either side accepted until 14:00; stop at the middle of the range; flat at 16:00.",
+     "discovery": {
+      "sharpe": 1.421,
+      "t": 3.06,
+      "trades": 948,
+      "bpPerDay": 5.886,
+      "halves": [
+       2687.0,
+       4199.2
+      ]
+     },
+     "plateau": 1.15,
+     "holdout": {
+      "sharpe": -0.011,
+      "t": -0.02,
+      "trades": 770,
+      "bpPerDay": -0.042,
+      "halves": [
+       -208.7,
+       168.8
+      ]
+     },
+     "tVsBase": -1.6,
+     "passed": false,
+     "better": false
+    },
+    {
+     "variant": {
+      "range": 2,
       "lastEntry": 13,
       "stop": "mid",
       "target": 2.0,
@@ -169,103 +241,31 @@
       "filter": "none",
       "side": "both"
      },
-     "rule": "Opening range 09:00-10:00; breakout either side until the 13:00 bar; stop at the middle of the range, target 2R; flat at 16:00.",
+     "rule": "Opening range 09:00-11:00; breakout either side accepted until 14:00; stop at the middle of the range, target 2R; flat at 16:00.",
      "discovery": {
-      "sharpe": 1.649,
-      "t": 3.55,
-      "trades": 1037,
-      "bpPerDay": 5.876,
+      "sharpe": 1.384,
+      "t": 2.98,
+      "trades": 948,
+      "bpPerDay": 5.242,
       "halves": [
-       1136.9,
-       5738.5
+       1811.3,
+       4322.0
       ]
      },
-     "plateau": 1.406,
+     "plateau": 1.142,
      "holdout": {
-      "sharpe": 1.711,
-      "t": 3.31,
-      "trades": 826,
-      "bpPerDay": 4.865,
+      "sharpe": -0.417,
+      "t": -0.81,
+      "trades": 770,
+      "bpPerDay": -1.245,
       "halves": [
-       3241.5,
-       1341.7
+       -1003.3,
+       -169.7
       ]
      },
-     "tVsBase": -1.35,
-     "passed": true,
+     "tVsBase": -2.63,
+     "passed": false,
      "better": false
-    },
-    {
-     "variant": {
-      "range": 1,
-      "lastEntry": 13,
-      "stop": "far",
-      "target": 2.0,
-      "exit": 16,
-      "filter": "none",
-      "side": "both"
-     },
-     "rule": "Opening range 09:00-10:00; breakout either side until the 13:00 bar; stop at the far side of the range, target 2R; flat at 16:00.",
-     "discovery": {
-      "sharpe": 1.81,
-      "t": 3.9,
-      "trades": 1037,
-      "bpPerDay": 9.059,
-      "halves": [
-       2408.7,
-       8189.9
-      ]
-     },
-     "plateau": 1.383,
-     "holdout": {
-      "sharpe": 2.375,
-      "t": 4.59,
-      "trades": 826,
-      "bpPerDay": 9.539,
-      "halves": [
-       5407.4,
-       3578.1
-      ]
-     },
-     "tVsBase": 2.05,
-     "passed": true,
-     "better": true
-    },
-    {
-     "variant": {
-      "range": 1,
-      "lastEntry": 11,
-      "stop": "far",
-      "target": null,
-      "exit": 16,
-      "filter": "none",
-      "side": "both"
-     },
-     "rule": "Opening range 09:00-10:00; breakout either side until the 11:00 bar; stop at the far side of the range; flat at 16:00.",
-     "discovery": {
-      "sharpe": 1.777,
-      "t": 3.83,
-      "trades": 1008,
-      "bpPerDay": 9.263,
-      "halves": [
-       2260.8,
-       8577.2
-      ]
-     },
-     "plateau": 1.368,
-     "holdout": {
-      "sharpe": 2.263,
-      "t": 4.38,
-      "trades": 810,
-      "bpPerDay": 10.474,
-      "halves": [
-       5762.1,
-       4104.6
-      ]
-     },
-     "tVsBase": 2.38,
-     "passed": true,
-     "better": true
     }
    ]
   },
@@ -280,32 +280,32 @@
     "2026-11-19"
    ],
    "base": {
-    "rule": "Opening range 09:00-10:00; breakout either side until the 15:00 bar; stop at the middle of the range; flat at 16:00.",
+    "rule": "Opening range 09:00-10:00; breakout either side accepted until 16:00; stop at the middle of the range; flat at 16:00.",
     "discovery": {
-     "sharpe": 1.413,
-     "t": 4.44,
-     "trades": 2144,
-     "bpPerDay": 3.733,
+     "sharpe": 0.767,
+     "t": 2.41,
+     "trades": 2367,
+     "bpPerDay": 2.053,
      "halves": [
-      7113.6,
-      2188.7
+      4351.6,
+      764.6
      ]
     },
     "holdout": {
-     "sharpe": 1.157,
-     "t": 3.0,
-     "trades": 1487,
-     "bpPerDay": 3.129,
+     "sharpe": 0.455,
+     "t": 1.18,
+     "trades": 1626,
+     "bpPerDay": 1.251,
      "halves": [
-      2866.9,
-      2451.8
+      1519.3,
+      607.5
      ]
     }
    },
    "discoverySharpe": {
-    "best": 1.45,
-    "median": -0.15,
-    "share_positive": 0.41
+    "best": 0.78,
+    "median": -0.24,
+    "share_positive": 0.3
    },
    "top": [
     {
@@ -318,29 +318,65 @@
       "filter": "none",
       "side": "both"
      },
-     "rule": "Opening range 09:00-10:00; breakout either side until the 13:00 bar; stop at the middle of the range; flat at 15:00.",
+     "rule": "Opening range 09:00-10:00; breakout either side accepted until 14:00; stop at the middle of the range; flat at 15:00.",
      "discovery": {
-      "sharpe": 1.45,
-      "t": 4.56,
-      "trades": 2121,
-      "bpPerDay": 3.645,
+      "sharpe": 0.779,
+      "t": 2.45,
+      "trades": 2342,
+      "bpPerDay": 1.987,
       "halves": [
-       7242.2,
-       1841.5
+       4502.4,
+       449.7
       ]
      },
-     "plateau": 0.744,
+     "plateau": 0.459,
      "holdout": {
-      "sharpe": 0.928,
-      "t": 2.41,
-      "trades": 1464,
-      "bpPerDay": 2.425,
+      "sharpe": 0.208,
+      "t": 0.54,
+      "trades": 1603,
+      "bpPerDay": 0.554,
       "halves": [
-       2065.6,
-       2057.5
+       718.1,
+       223.3
       ]
      },
-     "tVsBase": -2.37,
+     "tVsBase": -2.35,
+     "passed": false,
+     "better": false
+    },
+    {
+     "variant": {
+      "range": 1,
+      "lastEntry": 13,
+      "stop": "mid",
+      "target": null,
+      "exit": 15,
+      "filter": "gap",
+      "side": "both"
+     },
+     "rule": "Opening range 09:00-10:00; breakout either side accepted until 14:00; stop at the middle of the range; flat at 15:00. Only in the direction of the move from the prior 16:00 close.",
+     "discovery": {
+      "sharpe": 0.736,
+      "t": 2.32,
+      "trades": 1580,
+      "bpPerDay": 1.579,
+      "halves": [
+       3720.6,
+       214.1
+      ]
+     },
+     "plateau": 0.459,
+     "holdout": {
+      "sharpe": 0.411,
+      "t": 1.07,
+      "trades": 1071,
+      "bpPerDay": 0.894,
+      "halves": [
+       552.5,
+       966.8
+      ]
+     },
+     "tVsBase": -0.48,
      "passed": false,
      "better": false
     },
@@ -354,30 +390,30 @@
       "filter": "narrow",
       "side": "both"
      },
-     "rule": "Opening range 09:00-10:00; breakout either side until the 13:00 bar; stop at the middle of the range; flat at 15:00. Only when the opening range is narrower than usual.",
+     "rule": "Opening range 09:00-10:00; breakout either side accepted until 14:00; stop at the middle of the range; flat at 15:00. Only when the opening range is narrower than usual.",
      "discovery": {
-      "sharpe": 1.295,
-      "t": 4.07,
-      "trades": 1054,
-      "bpPerDay": 2.088,
+      "sharpe": 0.595,
+      "t": 1.87,
+      "trades": 1223,
+      "bpPerDay": 0.976,
       "halves": [
-       3878.9,
-       1323.8
+       2071.2,
+       362.0
       ]
      },
-     "plateau": 0.744,
+     "plateau": 0.459,
      "holdout": {
-      "sharpe": 1.256,
-      "t": 3.26,
-      "trades": 605,
-      "bpPerDay": 1.921,
+      "sharpe": 0.497,
+      "t": 1.29,
+      "trades": 704,
+      "bpPerDay": 0.779,
       "halves": [
-       932.6,
-       2332.7
+       36.1,
+       1288.1
       ]
      },
-     "tVsBase": -1.44,
-     "passed": true,
+     "tVsBase": -0.55,
+     "passed": false,
      "better": false
     },
     {
@@ -390,30 +426,30 @@
       "filter": "none",
       "side": "both"
      },
-     "rule": "Opening range 09:00-10:00; breakout either side until the 15:00 bar; stop at the middle of the range; flat at 16:00.",
+     "rule": "Opening range 09:00-10:00; breakout either side accepted until 16:00; stop at the middle of the range; flat at 16:00.",
      "discovery": {
-      "sharpe": 1.413,
-      "t": 4.44,
-      "trades": 2144,
-      "bpPerDay": 3.733,
+      "sharpe": 0.767,
+      "t": 2.41,
+      "trades": 2367,
+      "bpPerDay": 2.053,
       "halves": [
-       7113.6,
-       2188.7
+       4351.6,
+       764.6
       ]
      },
-     "plateau": 0.734,
+     "plateau": 0.455,
      "holdout": {
-      "sharpe": 1.157,
-      "t": 3.0,
-      "trades": 1487,
-      "bpPerDay": 3.129,
+      "sharpe": 0.455,
+      "t": 1.18,
+      "trades": 1626,
+      "bpPerDay": 1.251,
       "halves": [
-       2866.9,
-       2451.8
+       1519.3,
+       607.5
       ]
      },
      "tVsBase": 0.0,
-     "passed": true,
+     "passed": false,
      "better": false
     },
     {
@@ -423,69 +459,33 @@
       "stop": "mid",
       "target": null,
       "exit": 16,
-      "filter": "narrow",
+      "filter": "gap",
       "side": "both"
      },
-     "rule": "Opening range 09:00-10:00; breakout either side until the 15:00 bar; stop at the middle of the range; flat at 16:00. Only when the opening range is narrower than usual.",
+     "rule": "Opening range 09:00-10:00; breakout either side accepted until 16:00; stop at the middle of the range; flat at 16:00. Only in the direction of the move from the prior 16:00 close.",
      "discovery": {
-      "sharpe": 1.224,
-      "t": 3.85,
-      "trades": 1060,
-      "bpPerDay": 2.026,
+      "sharpe": 0.768,
+      "t": 2.41,
+      "trades": 1631,
+      "bpPerDay": 1.729,
       "halves": [
-       3498.2,
-       1550.6
+       4087.3,
+       221.0
       ]
      },
-     "plateau": 0.734,
+     "plateau": 0.455,
      "holdout": {
-      "sharpe": 1.36,
-      "t": 3.53,
-      "trades": 611,
-      "bpPerDay": 2.252,
+      "sharpe": 0.638,
+      "t": 1.66,
+      "trades": 1110,
+      "bpPerDay": 1.489,
       "halves": [
-       1225.0,
-       2603.5
+       853.1,
+       1678.8
       ]
      },
-     "tVsBase": -1.06,
-     "passed": true,
-     "better": false
-    },
-    {
-     "variant": {
-      "range": 1,
-      "lastEntry": 13,
-      "stop": "mid",
-      "target": null,
-      "exit": 16,
-      "filter": "none",
-      "side": "both"
-     },
-     "rule": "Opening range 09:00-10:00; breakout either side until the 13:00 bar; stop at the middle of the range; flat at 16:00.",
-     "discovery": {
-      "sharpe": 1.378,
-      "t": 4.33,
-      "trades": 2121,
-      "bpPerDay": 3.627,
-      "halves": [
-       7029.4,
-       2009.8
-      ]
-     },
-     "plateau": 0.72,
-     "holdout": {
-      "sharpe": 1.134,
-      "t": 2.95,
-      "trades": 1464,
-      "bpPerDay": 3.059,
-      "halves": [
-       2733.6,
-       2466.9
-      ]
-     },
-     "tVsBase": -0.9,
-     "passed": true,
+     "tVsBase": 0.33,
+     "passed": false,
      "better": false
     }
    ]

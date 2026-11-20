@@ -121,9 +121,7 @@ def plan(v, i, P):
     if not allow:
         return None
     for j in range(k0, last + 1):
-        up, dn = H[j] > hi and 1 in allow, Lw[j] < lo and -1 in allow
-        if up and dn:
-            return None
+        up, dn = L.first_side(O, H, Lw, j, hi, lo, allow)
         if up or dn:
             d = 1 if up else -1
             trig = hi if up else lo

@@ -1,0 +1,737 @@
+{
+ "generated": "2026-11-20T06:49+00:00",
+ "families": 20,
+ "tests": 40,
+ "advanceRule": "discovery t >= 2.0, >= 100 trades, both halves positive",
+ "advanced": 5,
+ "holdoutBar": 2.33,
+ "periods": {
+  "nq": {
+   "discovery": [
+    "2018-04-13",
+    "2022-12-30"
+   ],
+   "holdout": [
+    "2023-01-03",
+    "2026-11-19"
+   ]
+  },
+  "gold": {
+   "discovery": [
+    "2010-01-04",
+    "2019-12-31"
+   ],
+   "holdout": [
+    "2020-01-02",
+    "2026-11-19"
+   ]
+  }
+ },
+ "results": [
+  {
+   "market": "nq",
+   "id": "london-far-12",
+   "rule": "Asia-range breakout: the 18:00-03:00 range; a stop order above it buys and one below sells, accepted 03:00-09:00; stop at the far side of the range; flat at 12:00.",
+   "discovery": {
+    "sharpe": -0.016,
+    "t": -0.03,
+    "trades": 1012,
+    "bpPerDay": -0.083,
+    "halves": [
+     4.0,
+     -100.8
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "london-far-16",
+   "rule": "Asia-range breakout: the 18:00-03:00 range; a stop order above it buys and one below sells, accepted 03:00-09:00; stop at the far side of the range; flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.256,
+    "t": 0.55,
+    "trades": 1012,
+    "bpPerDay": 1.601,
+    "halves": [
+     1457.9,
+     415.7
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "london-mid-12",
+   "rule": "Asia-range breakout: the 18:00-03:00 range; a stop order above it buys and one below sells, accepted 03:00-09:00; stop at the middle of the range; flat at 12:00.",
+   "discovery": {
+    "sharpe": 0.467,
+    "t": 1.01,
+    "trades": 1012,
+    "bpPerDay": 1.998,
+    "halves": [
+     432.9,
+     1905.0
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "london-mid-16",
+   "rule": "Asia-range breakout: the 18:00-03:00 range; a stop order above it buys and one below sells, accepted 03:00-09:00; stop at the middle of the range; flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.338,
+    "t": 0.73,
+    "trades": 1012,
+    "bpPerDay": 1.702,
+    "halves": [
+     552.5,
+     1438.4
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "premarket",
+   "rule": "Pre-market range breakout: the 08:00-09:00 range; stop orders beyond it accepted 09:00-12:00; stop at the far side; flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.728,
+    "t": 1.57,
+    "trades": 1142,
+    "bpPerDay": 3.912,
+    "halves": [
+     177.0,
+     4400.3
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "nr4-orb",
+   "rule": "Narrow-range breakout (Crabel NR4): breakout v2 (09:00-10:00 range, orders until 12:00, far-side stop, flat 16:00), only on days after the narrowest 09:00-16:00 session of the last 4.",
+   "discovery": {
+    "sharpe": 1.11,
+    "t": 2.39,
+    "trades": 282,
+    "bpPerDay": 2.854,
+    "halves": [
+     1129.7,
+     2209.6
+    ]
+   },
+   "advanced": true,
+   "holdout": {
+    "sharpe": 1.006,
+    "t": 1.95,
+    "trades": 228,
+    "bpPerDay": 2.16,
+    "halves": [
+     1649.6,
+     384.8
+    ]
+   },
+   "corrV2": 0.44,
+   "beatRandom": 0.995,
+   "passed": false
+  },
+  {
+   "market": "nq",
+   "id": "nr7-orb",
+   "rule": "Narrow-range breakout (Crabel NR7): breakout v2 (09:00-10:00 range, orders until 12:00, far-side stop, flat 16:00), only on days after the narrowest 09:00-16:00 session of the last 7.",
+   "discovery": {
+    "sharpe": 0.661,
+    "t": 1.42,
+    "trades": 172,
+    "bpPerDay": 1.341,
+    "halves": [
+     585.4,
+     983.7
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "williams-0.5",
+   "rule": "Volatility breakout (Williams): stop orders at the 09:00 open plus and minus 0.5x the prior day's full range, accepted 09:00-15:00; stop at the 09:00 open; flat at 16:00.",
+   "discovery": {
+    "sharpe": 1.562,
+    "t": 3.37,
+    "trades": 663,
+    "bpPerDay": 6.663,
+    "halves": [
+     3329.9,
+     4465.4
+    ]
+   },
+   "advanced": true,
+   "holdout": {
+    "sharpe": 1.02,
+    "t": 1.97,
+    "trades": 560,
+    "bpPerDay": 4.142,
+    "halves": [
+     1719.0,
+     2182.6
+    ]
+   },
+   "corrV2": 0.66,
+   "beatRandom": 1.0,
+   "passed": false
+  },
+  {
+   "market": "nq",
+   "id": "williams-0.3",
+   "rule": "Volatility breakout (Williams): stop orders at the 09:00 open plus and minus 0.3x the prior day's full range, accepted 09:00-15:00; stop at the 09:00 open; flat at 16:00.",
+   "discovery": {
+    "sharpe": 1.076,
+    "t": 2.32,
+    "trades": 1013,
+    "bpPerDay": 5.488,
+    "halves": [
+     45.9,
+     6374.7
+    ]
+   },
+   "advanced": true,
+   "holdout": {
+    "sharpe": 1.458,
+    "t": 2.82,
+    "trades": 812,
+    "bpPerDay": 6.835,
+    "halves": [
+     3056.7,
+     3381.8
+    ]
+   },
+   "corrV2": 0.72,
+   "beatRandom": 1.0,
+   "passed": true
+  },
+  {
+   "market": "nq",
+   "id": "failed-breakout",
+   "rule": "Failed breakout fade: when the first break of the 09:00-10:00 range (10:00-14:00) closes its hour back inside the range, trade the other way at the next open; stop at that hour's extreme, target the other side of the range, flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.53,
+    "t": 1.14,
+    "trades": 457,
+    "bpPerDay": 1.02,
+    "halves": [
+     1177.2,
+     15.6
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "prior-day-breakout",
+   "rule": "Prior-day range breakout: when 09:00 opens inside the prior day's full range, stop orders at that day's high and low, accepted 09:00-14:00; stop at the 09:00 open; flat at 16:00.",
+   "discovery": {
+    "sharpe": 1.085,
+    "t": 2.34,
+    "trades": 501,
+    "bpPerDay": 3.15,
+    "halves": [
+     1154.9,
+     2530.2
+    ]
+   },
+   "advanced": true,
+   "holdout": {
+    "sharpe": 1.457,
+    "t": 2.82,
+    "trades": 439,
+    "bpPerDay": 4.035,
+    "halves": [
+     1166.3,
+     2634.9
+    ]
+   },
+   "corrV2": 0.52,
+   "beatRandom": 1.0,
+   "passed": true
+  },
+  {
+   "market": "nq",
+   "id": "orb-vol-rising",
+   "rule": "Breakout v2 in rising volatility: only when the average range of the last five days is above the 20-day EWMA scale.",
+   "discovery": {
+    "sharpe": 0.123,
+    "t": 0.26,
+    "trades": 318,
+    "bpPerDay": 0.403,
+    "halves": [
+     213.3,
+     258.0
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "orb-vol-falling",
+   "rule": "Breakout v2 in falling volatility: only when the average range of the last five days is below the 20-day EWMA scale.",
+   "discovery": {
+    "sharpe": 0.882,
+    "t": 1.9,
+    "trades": 776,
+    "bpPerDay": 3.715,
+    "halves": [
+     147.8,
+     4199.0
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "afternoon",
+   "rule": "Afternoon range breakout: the 12:00-13:00 range; stop orders beyond it accepted 13:00-15:00; stop at the far side; flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.147,
+    "t": 0.32,
+    "trades": 1094,
+    "bpPerDay": 0.547,
+    "halves": [
+     126.6,
+     513.8
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "gao-noon",
+   "rule": "Intraday momentum, later signal: the return from the prior 16:00 close to 12:00 sets the direction; trade at the 14:00 open, stop half the remaining range away, flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.774,
+    "t": 1.67,
+    "trades": 1142,
+    "bpPerDay": 2.432,
+    "halves": [
+     -339.0,
+     3185.0
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "gao-13",
+   "rule": "Intraday momentum, later signal: the return from the prior 16:00 close to 13:00 sets the direction; trade at the 15:00 open, stop half the remaining range away, flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.644,
+    "t": 1.39,
+    "trades": 1142,
+    "bpPerDay": 1.545,
+    "halves": [
+     278.3,
+     1529.7
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "first-hour-last",
+   "rule": "First hour to last two hours: a 09:00-10:00 move of at least 0.25x the typical day range sets the direction for 14:00-16:00; stop half the remaining range away.",
+   "discovery": {
+    "sharpe": 0.308,
+    "t": 0.66,
+    "trades": 271,
+    "bpPerDay": 0.506,
+    "halves": [
+     88.2,
+     504.1
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "trend-vote",
+   "rule": "Trend vote: the signs of the 5-, 20- and 60-day returns (majority) set the direction at the 10:00 open; stop half the remaining range away, flat at 16:00.",
+   "discovery": {
+    "sharpe": -0.022,
+    "t": -0.05,
+    "trades": 1050,
+    "bpPerDay": -0.115,
+    "halves": [
+     1236.8,
+     -1371.8
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "trend-vote-all",
+   "rule": "Trend vote: the signs of the 5-, 20- and 60-day returns (all three agree) set the direction at the 10:00 open; stop half the remaining range away, flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.002,
+    "t": 0.0,
+    "trades": 562,
+    "bpPerDay": 0.006,
+    "halves": [
+     780.5,
+     -773.0
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "gap-reversal",
+   "rule": "Gap reversal: when 09:00 opens at least 0.3x the typical range away from the prior 16:00 close and the 09:00 hour moves back against it, fade the gap at 10:00; stop beyond the 09:00 hour, target the prior close, flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.28,
+    "t": 0.6,
+    "trades": 210,
+    "bpPerDay": 0.518,
+    "halves": [
+     170.5,
+     435.4
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "london-far-12",
+   "rule": "Asia-range breakout: the 18:00-03:00 range; a stop order above it buys and one below sells, accepted 03:00-09:00; stop at the far side of the range; flat at 12:00.",
+   "discovery": {
+    "sharpe": 0.404,
+    "t": 1.27,
+    "trades": 2240,
+    "bpPerDay": 1.446,
+    "halves": [
+     2316.6,
+     1286.2
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "london-far-16",
+   "rule": "Asia-range breakout: the 18:00-03:00 range; a stop order above it buys and one below sells, accepted 03:00-09:00; stop at the far side of the range; flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.389,
+    "t": 1.22,
+    "trades": 2240,
+    "bpPerDay": 1.583,
+    "halves": [
+     2964.9,
+     980.7
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "london-mid-12",
+   "rule": "Asia-range breakout: the 18:00-03:00 range; a stop order above it buys and one below sells, accepted 03:00-09:00; stop at the middle of the range; flat at 12:00.",
+   "discovery": {
+    "sharpe": 0.206,
+    "t": 0.65,
+    "trades": 2240,
+    "bpPerDay": 0.632,
+    "halves": [
+     925.9,
+     649.7
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "london-mid-16",
+   "rule": "Asia-range breakout: the 18:00-03:00 range; a stop order above it buys and one below sells, accepted 03:00-09:00; stop at the middle of the range; flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.326,
+    "t": 1.02,
+    "trades": 2240,
+    "bpPerDay": 1.134,
+    "halves": [
+     2104.4,
+     722.6
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "premarket",
+   "rule": "Pre-market range breakout: the 08:00-09:00 range; stop orders beyond it accepted 09:00-12:00; stop at the far side; flat at 16:00.",
+   "discovery": {
+    "sharpe": -0.295,
+    "t": -0.93,
+    "trades": 2369,
+    "bpPerDay": -0.931,
+    "halves": [
+     -334.0,
+     -1985.5
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "nr4-orb",
+   "rule": "Narrow-range breakout (Crabel NR4): breakout v2 (09:00-10:00 range, orders until 12:00, far-side stop, flat 16:00), only on days after the narrowest 09:00-16:00 session of the last 4.",
+   "discovery": {
+    "sharpe": 0.287,
+    "t": 0.9,
+    "trades": 568,
+    "bpPerDay": 0.431,
+    "halves": [
+     1219.0,
+     -144.8
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "nr7-orb",
+   "rule": "Narrow-range breakout (Crabel NR7): breakout v2 (09:00-10:00 range, orders until 12:00, far-side stop, flat 16:00), only on days after the narrowest 09:00-16:00 session of the last 7.",
+   "discovery": {
+    "sharpe": 0.335,
+    "t": 1.05,
+    "trades": 320,
+    "bpPerDay": 0.356,
+    "halves": [
+     846.0,
+     41.9
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "williams-0.5",
+   "rule": "Volatility breakout (Williams): stop orders at the 09:00 open plus and minus 0.5x the prior day's full range, accepted 09:00-15:00; stop at the 09:00 open; flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.796,
+    "t": 2.5,
+    "trades": 1171,
+    "bpPerDay": 1.909,
+    "halves": [
+     4057.8,
+     700.3
+    ]
+   },
+   "advanced": true,
+   "holdout": {
+    "sharpe": 0.006,
+    "t": 0.01,
+    "trades": 783,
+    "bpPerDay": 0.013,
+    "halves": [
+     1533.0,
+     -1511.2
+    ]
+   },
+   "corrV2": 0.5,
+   "beatRandom": 0.64,
+   "passed": false
+  },
+  {
+   "market": "gold",
+   "id": "williams-0.3",
+   "rule": "Volatility breakout (Williams): stop orders at the 09:00 open plus and minus 0.3x the prior day's full range, accepted 09:00-15:00; stop at the 09:00 open; flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.544,
+    "t": 1.71,
+    "trades": 1860,
+    "bpPerDay": 1.553,
+    "halves": [
+     3095.0,
+     775.4
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "failed-breakout",
+   "rule": "Failed breakout fade: when the first break of the 09:00-10:00 range (10:00-14:00) closes its hour back inside the range, trade the other way at the next open; stop at that hour's extreme, target the other side of the range, flat at 16:00.",
+   "discovery": {
+    "sharpe": -0.704,
+    "t": -2.21,
+    "trades": 989,
+    "bpPerDay": -0.626,
+    "halves": [
+     -623.4,
+     -936.3
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "prior-day-breakout",
+   "rule": "Prior-day range breakout: when 09:00 opens inside the prior day's full range, stop orders at that day's high and low, accepted 09:00-14:00; stop at the 09:00 open; flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.568,
+    "t": 1.79,
+    "trades": 788,
+    "bpPerDay": 1.017,
+    "halves": [
+     1897.3,
+     637.0
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "orb-vol-rising",
+   "rule": "Breakout v2 in rising volatility: only when the average range of the last five days is above the 20-day EWMA scale.",
+   "discovery": {
+    "sharpe": -0.244,
+    "t": -0.77,
+    "trades": 526,
+    "bpPerDay": -0.392,
+    "halves": [
+     -914.6,
+     -62.4
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "orb-vol-falling",
+   "rule": "Breakout v2 in falling volatility: only when the average range of the last five days is below the 20-day EWMA scale.",
+   "discovery": {
+    "sharpe": 0.458,
+    "t": 1.44,
+    "trades": 1699,
+    "bpPerDay": 1.162,
+    "halves": [
+     2836.4,
+     58.6
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "afternoon",
+   "rule": "Afternoon range breakout: the 12:00-13:00 range; stop orders beyond it accepted 13:00-15:00; stop at the far side; flat at 16:00.",
+   "discovery": {
+    "sharpe": -0.532,
+    "t": -1.67,
+    "trades": 2232,
+    "bpPerDay": -0.953,
+    "halves": [
+     -354.1,
+     -2021.8
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "gao-noon",
+   "rule": "Intraday momentum, later signal: the return from the prior 16:00 close to 12:00 sets the direction; trade at the 14:00 open, stop half the remaining range away, flat at 16:00.",
+   "discovery": {
+    "sharpe": -1.393,
+    "t": -4.38,
+    "trades": 2458,
+    "bpPerDay": -1.917,
+    "halves": [
+     -2290.0,
+     -2487.2
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "gao-13",
+   "rule": "Intraday momentum, later signal: the return from the prior 16:00 close to 13:00 sets the direction; trade at the 15:00 open, stop half the remaining range away, flat at 16:00.",
+   "discovery": {
+    "sharpe": -2.622,
+    "t": -8.25,
+    "trades": 2458,
+    "bpPerDay": -2.313,
+    "halves": [
+     -2802.4,
+     -2962.8
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "first-hour-last",
+   "rule": "First hour to last two hours: a 09:00-10:00 move of at least 0.25x the typical day range sets the direction for 14:00-16:00; stop half the remaining range away.",
+   "discovery": {
+    "sharpe": -0.707,
+    "t": -2.22,
+    "trades": 421,
+    "bpPerDay": -0.417,
+    "halves": [
+     -283.2,
+     -755.8
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "trend-vote",
+   "rule": "Trend vote: the signs of the 5-, 20- and 60-day returns (majority) set the direction at the 10:00 open; stop half the remaining range away, flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.043,
+    "t": 0.14,
+    "trades": 2369,
+    "bpPerDay": 0.132,
+    "halves": [
+     2777.4,
+     -2448.3
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "trend-vote-all",
+   "rule": "Trend vote: the signs of the 5-, 20- and 60-day returns (all three agree) set the direction at the 10:00 open; stop half the remaining range away, flat at 16:00.",
+   "discovery": {
+    "sharpe": 0.07,
+    "t": 0.22,
+    "trades": 1122,
+    "bpPerDay": 0.147,
+    "halves": [
+     1104.0,
+     -737.6
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "gap-reversal",
+   "rule": "Gap reversal: when 09:00 opens at least 0.3x the typical range away from the prior 16:00 close and the 09:00 hour moves back against it, fade the gap at 10:00; stop beyond the 09:00 hour, target the prior close, flat at 16:00.",
+   "discovery": {
+    "sharpe": -0.691,
+    "t": -2.17,
+    "trades": 538,
+    "bpPerDay": -0.673,
+    "halves": [
+     -678.0,
+     -999.9
+    ]
+   },
+   "advanced": false
+  }
+ ]
+}
