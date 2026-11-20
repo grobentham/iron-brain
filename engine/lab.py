@@ -68,6 +68,10 @@ CHANGES = [
                    "that passed a discovery search of 20 literature rules per market (engine/discover.py: discovery "
                    "on NQ to 2022 and gold to 2019; 5 of 40 advanced; both passed the later data at t 2.82 against a "
                    "bar of 2.33, NQ only). Both also run on gold, where they did not advance."],
+    ["2026-11-20", "Registered 'opening drive, else breakout', the best of five combinations of the opening drive and "
+                   "the breakout written down beforehand (engine/combine.py): NQ holdout Sharpe 1.33, t 2.56 against a "
+                   "bar of 2.58, so just short; above either rule alone on the same days (drive 1.06, breakout 0.93). "
+                   "The two direction filters on the breakout did well on discovery and poorly on the holdout."],
 ]
 ND = NormalDist()
 
@@ -375,6 +379,29 @@ def q_vol_breakout(day, s, w, ctx=None):
     return _levels_break(day, o9 + k, o9 - k, o9, slot(9), slot(14))
 
 
+def _drive_dir(day, s):
+    k = slot(10)
+    m = math.log(day[4][k - 1] / day[1][k - 1])
+    return (1 if m > 0 else -1) if abs(m) >= 0.25 * s else 0
+
+
+def q_drive_or_orb(day, s, w, ctx=None):
+    """Opening drive, else breakout: when the 09:00-10:00 hour moves at least a quarter of the typical day range,
+    trade the opening drive (in its direction at the 10:00 open, stop half the remaining range away). On every other
+    day, the opening-range breakout v1 (stop orders beyond the 09:00-10:00 range until 16:00, stop at the middle of
+    the range). Flat at 16:00, one trade a day. Chosen from five combinations written down beforehand, on NQ data
+    to 2022 (engine/combine.py)."""
+    if _drive_dir(day, s):
+        return i_opening_drive(day, s, w)
+    return q_orb(day, s, w, ctx)
+
+
+def b_drive_or_orb(day, s, w, ctx=None):
+    if _drive_dir(day, s):
+        return None
+    return _bracket(day, 15, "mid", 16)
+
+
 def _orders_at_nine(hi, lo, o9, last_entry):
     if not (np.isfinite(hi) and np.isfinite(lo) and hi > o9 > lo):
         return None
@@ -561,6 +588,8 @@ STRATEGIES = [
      "bracket": b_prior_day_breakout, "ordersFrom": 9, "daily": True, "registered": "2026-11-20", "family": "quant"},
     {"id": "vol-breakout", "name": "Volatility breakout (Williams)", "kind": "intraday", "fn": q_vol_breakout,
      "bracket": b_vol_breakout, "ordersFrom": 9, "daily": True, "registered": "2026-11-20", "family": "quant"},
+    {"id": "drive-or-orb", "name": "Opening drive, else breakout", "kind": "intraday", "fn": q_drive_or_orb,
+     "bracket": b_drive_or_orb, "daily": True, "registered": "2026-11-20", "family": "quant"},
     {"id": "model", "name": "Model: walk-forward logistic regression", "kind": "intraday", "fn": q_model,
      "daily": True, "registered": "2026-11-20", "family": "quant"},
     {"id": "momentum-20", "name": "20-day momentum", "kind": "daily", "fn": d_momentum},
@@ -897,7 +926,7 @@ def _decision_slot(st):
     return {"orb": slot(15), "orb-v2": slot(11), "orb-active": slot(15), "intraday-momentum": slot(15), "mean-reversion": slot(14),
             "channel-breakout": slot(14), "trend-session": slot(10), "model": slot(10),"exhaustion": slot(14), "opening-drive": slot(10), "overnight-fade": slot(9), "overnight-long": 0,
             "late-momentum": slot(15), "fast-trend": slot(12), "trend-day": 0, "month-turn-day": 0,
-            "prior-day-breakout": slot(13), "vol-breakout": slot(14)}[st["id"]]
+            "prior-day-breakout": slot(13), "vol-breakout": slot(14), "drive-or-orb": slot(15)}[st["id"]]
 
 
 def _last_weekday(y, m):
