@@ -15,8 +15,9 @@ NAMES = {"nq": "NQ", "gold": "Gold"}
 
 
 def key(x):
+    """What makes a signal new: its state (orders, then a fill), direction, entry time and trading day."""
     lv = x.get("live") or {}
-    return (lv.get("state"), lv.get("dir"), lv.get("at"), lv.get("asOf") if lv.get("dir") not in (None, "FLAT") else None)
+    return (lv.get("state"), lv.get("dir"), lv.get("at"), lv.get("day") or lv.get("asOf"))
 
 
 def changes(old, new):
@@ -26,10 +27,10 @@ def changes(old, new):
         if x.get("tier") not in ("tested", "candidate"):
             continue
         lv = x.get("live") or {}
-        if lv.get("state") != "signal":
+        if lv.get("state") not in ("signal", "orders"):
             continue
         p = prev.get((x["market"], x["id"]))
-        if p is not None and key(p)[:2] == key(x)[:2] and (p.get("live") or {}).get("at") == lv.get("at"):
+        if p is not None and key(p) == key(x):
             continue
         out.append(x)
     return out
@@ -40,7 +41,12 @@ def text(x):
     tier = "Tested signal" if x["tier"] == "tested" else "Candidate (not fully tested)"
     title = f"[{tier}] {NAMES.get(x['market'], x['market'])} {x['name']}: {lv.get('dir')}"
     lines = [f"**{tier}.** {x['rule']}", ""]
-    if lv.get("entry"):
+    if lv.get("state") == "orders":
+        title = f"[{tier}] {NAMES.get(x['market'], x['market'])} {x['name']}: place orders"
+        lines.append(f"Buy stop {lv['buyStop']} (protective stop {lv['stopLong']}) and sell stop {lv['sellStop']} "
+                     f"(protective stop {lv['stopShort']}), one cancels the other. Cancel if unfilled by "
+                     f"{lv['cancelAt']} New York; flat by {lv['exitBy']}.")
+    elif lv.get("entry"):
         lines.append(f"Entry {lv['entry']} at {lv.get('at')} New York, stop {lv.get('stop')}"
                      + (f", target {lv['target']}" if lv.get("target") else "") + f", out by {lv.get('exitBy')}.")
     else:

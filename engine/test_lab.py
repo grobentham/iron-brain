@@ -112,6 +112,24 @@ def test_lab_finds_a_planted_edge():
     assert L.tstat(L.daily_series(len(edged), tr)) > 3, "a strong planted edge is detected"
 
 
+def test_breakout_orders_live():
+    """At 10:20 New York the breakout gives its two stop orders; once one fills it reports the position."""
+    import datetime as dt_
+    days, s, rows = _days()
+    w = L.profiles(days)[-1]
+    d = days[-1][0]
+    st = [x for x in L.STRATEGIES if x["id"] == "orb-v2"][0]
+    ctx = {"market": "nq"}
+    at = lambda h, m: dt_.datetime.combine(d, dt_.time(h, m), D.NY)
+    o = L.live_intraday(st, rows, s[-1], w, at(10, 20), ctx)
+    assert o["state"] == "orders" and o["buyStop"] > o["sellStop"], o
+    assert o["stopLong"] == o["sellStop"] and o["stopShort"] == o["buyStop"] and o["cancelAt"] == "12:00", o
+    early = L.live_intraday(st, rows, s[-1], w, at(10, 5), ctx)
+    assert early["state"] == "waiting", "the 09:00 bar is not final until about 10:12"
+    late = L.live_intraday(st, rows, s[-1], w, at(14, 30), ctx)
+    assert late["state"] in ("signal", "none"), late
+
+
 def test_alerts_only_for_new_signals():
     import alerts
     cand = {"market": "nq", "id": "trend-200", "tier": "candidate", "live": {"state": "signal", "dir": "LONG", "asOf": "2026-11-20"}}
@@ -124,11 +142,19 @@ def test_alerts_only_for_new_signals():
     title, body = alerts.text(cand | {"name": "200-day trend filter", "rule": "r", "t": 3.2, "beatRandom": 0.98,
                                       "dsr": 0.91, "forward": {"since": "2026-11-19", "trades": 0}})
     assert "Candidate" in title and "not advice" in body
+    orders = dict(cand, live={"state": "orders", "day": "2026-11-20", "buyStop": 2, "sellStop": 1, "stopLong": 1,
+                              "stopShort": 2, "cancelAt": "11:00", "exitBy": "16:00"})
+    assert len(alerts.changes({"lab": {"strategies": []}}, {"lab": {"strategies": [orders]}})) == 1
+    assert alerts.changes({"lab": {"strategies": [orders]}}, {"lab": {"strategies": [orders]}}) == []
+    t2, b2 = alerts.text(orders | {"name": "Breakout", "rule": "r", "t": 5, "beatRandom": 1, "dsr": 1,
+                                   "forward": {"since": "2026-11-20", "trades": 0}})
+    assert "place orders" in t2 and "Buy stop 2" in b2
 
 
 if __name__ == "__main__":
     test_alerts_only_for_new_signals()
     test_lab_finds_a_planted_edge()
+    test_breakout_orders_live()
     test_fills_are_conservative()
     test_no_look_ahead()
     test_daily_rules_use_only_past_closes()

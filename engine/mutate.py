@@ -55,7 +55,7 @@ def describe(v):
             "wide": " Only when the opening range is wider than usual."}[v["filter"]]
     side = "long only" if v["side"] == "long" else "either side"
     tgt = f", target {v['target']:g}R" if v["target"] else ""
-    return (f"Opening range {rng}; breakout {side} until the {v['lastEntry']}:00 bar; stop at {stop}{tgt}; "
+    return (f"Opening range {rng}; breakout {side} accepted until {v['lastEntry'] + 1}:00; stop at {stop}{tgt}; "
             f"flat at {v['exit']}:00.{filt}")
 
 
