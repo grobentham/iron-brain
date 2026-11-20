@@ -7,12 +7,12 @@
 //      v1 (original): orders stay until 16:00; stop at the middle of the range.
 //   4. One trade a day. Flat at 16:00 (the account is flattened at 16:10).
 // Size: risk per trade / (stop distance x point value), capped at the account limit (40 micros or 4 minis).
-// Use a 1- to 5-minute chart for the most faithful fills; 15 minutes also works. Not advice.
+// Use a 1- to 5-minute chart for the most faithful fills (Bar Magnifier is off: it needs TradingView Premium). Not advice.
 strategy("Iron Brain · Opening-range breakout v2", shorttitle = "IB ORB v2", overlay = true,
      initial_capital = 50000, currency = currency.USD, pyramiding = 0,
      default_qty_type = strategy.fixed, default_qty_value = 1,
      commission_type = strategy.commission.cash_per_contract, commission_value = 0.62,
-     slippage = 1, use_bar_magnifier = true, process_orders_on_close = false, max_bars_back = 500)
+     slippage = 1, use_bar_magnifier = false, process_orders_on_close = false, max_bars_back = 500)
 
 // ---------- inputs ----------
 string TZ      = "America/New_York"
