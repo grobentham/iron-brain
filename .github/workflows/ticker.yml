@@ -39,7 +39,7 @@ jobs:
           mkdir -p /tmp/q && cd /tmp/q && git init -q -b quotes
           git config user.name iron-brain && git config user.email iron-brain@users.noreply.github.com
           cd "$GITHUB_WORKSPACE"
-          end=$(( $(date +%s) + 5*3600 )); last_desk=0; last_hist=0
+          end=$(( $(date +%s) + 5*3600 )); last_desk=0; last_hist=0; orb_day=
           while [ "$(date +%s)" -lt "$end" ]; do
             dow=$(date -u +%u); hour=$(date -u +%H); open=1
             # futures trade from Sunday 22:00/23:00 UTC to Friday 21:00/22:00 UTC
@@ -55,6 +55,12 @@ jobs:
               if [ $(( now - last_hist )) -ge 3600 ]; then
                 # keep the long-history download going (GitHub's hourly cron for it doesn't fire); it exits at once when complete
                 gh workflow run history.yml -R "$REPO" --ref main >/dev/null 2>&1 && echo "$(date -u +%H:%M) history started"; last_hist=$now
+              fi
+              # the breakout's orders are known once the 09:00-10:00 bar is final (Yahoo runs ~10 min behind)
+              nyhm=$(TZ=America/New_York date +%H%M); nyday=$(TZ=America/New_York date +%F)
+              if [ "$nyhm" -ge 1012 ] && [ "$nyhm" -le 1030 ] && [ "$orb_day" != "$nyday" ]; then
+                gh workflow run desk.yml -R "$REPO" --ref main && echo "$(date -u +%H:%M) desk started for the breakout orders"
+                orb_day=$nyday; last_desk=$now
               fi
               if [ $(( now - last_desk )) -ge 900 ]; then
                 since=$(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%SZ)

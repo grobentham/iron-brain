@@ -175,7 +175,7 @@ def i_month_turn_day(day, s, w, ctx=None):
 # All flat at the 16:00 bar close; stops scale with the expected remaining range, so size scales with volatility.
 
 def q_orb(day, s, w, ctx=None, pace_min=None):
-    """Opening-range breakout: the 09:00-10:00 bar's high and low are the range. From 10:00 to 15:00, a stop order
+    """Opening-range breakout: the 09:00-10:00 bar's high and low are the range. From 10:00 to 16:00, a stop order
     above the high buys and one below the low sells (whichever trades first; a bar that crosses both is skipped).
     Stop at the middle of the range, flat at 16:00."""
     k0 = slot(10)
@@ -204,8 +204,9 @@ ORB_V2 = {"lastEntry": 11, "exit": 16}
 
 def q_orb_v2(day, s, w, ctx=None):
     """Opening-range breakout v2, found by the mutation search (engine/mutate.py) on older data only and confirmed
-    on later data it never saw: the 09:00-10:00 range; a breakout either side only until the 11:00 bar; stop at the
-    far side of the range; flat at 16:00. The same rule on both markets."""
+    on later data it never saw: the 09:00-10:00 range; a stop order above the high buys and one below the low sells,
+    accepted until 12:00 (whichever trades first); stop at the far side of the range; flat at 16:00. The same rule on
+    both markets."""
     p = ORB_V2
     k0 = slot(10)
     _, O, H, L, C = day
@@ -222,6 +223,36 @@ def q_orb_v2(day, s, w, ctx=None):
         if dn:
             return j, -1, hi, None, exit_slot, lo
     return None
+
+
+def _bracket(day, last_entry, stop_kind, exit_hour, rng_slot=None):
+    """The resting orders for a breakout once the 09:00-10:00 range is known."""
+    k0 = slot(10)
+    _, O, H, L, C = day
+    hi, lo = H[k0 - 1], L[k0 - 1]
+    if not (np.isfinite(hi) and np.isfinite(lo) and hi > lo):
+        return None
+    mid = (hi + lo) / 2
+    return {"buyStop": round(float(hi), 2), "sellStop": round(float(lo), 2),
+            "stopLong": round(float(mid if stop_kind == "mid" else lo), 2),
+            "stopShort": round(float(mid if stop_kind == "mid" else hi), 2),
+            "cancelAt": "%02d:00" % (last_entry + 1), "lastEntrySlot": slot(last_entry), "exitBy": "%02d:00" % exit_hour}
+
+
+def b_orb(day, s, w, ctx=None):
+    return _bracket(day, 15, "mid", 16)
+
+
+def b_orb_v2(day, s, w, ctx=None):
+    return _bracket(day, ORB_V2["lastEntry"], "far", ORB_V2["exit"])
+
+
+def b_orb_active(day, s, w, ctx=None):
+    k0 = slot(10)
+    _, _, _, _, dhi, dlo, rem, done = _ctx(day, k0, s, w)
+    if math.log(dhi / dlo) / done < 1.0:
+        return None
+    return _bracket(day, 15, "mid", 16)
 
 
 def q_orb_active(day, s, w, ctx=None):
@@ -433,11 +464,13 @@ STRATEGIES = [
      "registered": "2026-11-20"},
     {"id": "month-turn-day", "name": "Turn of the month, day session", "kind": "intraday", "fn": i_month_turn_day,
      "daily": True, "registered": "2026-11-20"},
-    {"id": "orb", "name": "Opening-range breakout", "kind": "intraday", "fn": q_orb, "daily": True,
+    {"id": "orb", "name": "Opening-range breakout", "kind": "intraday", "fn": q_orb, "daily": True, "bracket": b_orb,
      "registered": "2026-11-20", "family": "quant"},
     {"id": "orb-v2", "name": "Opening-range breakout v2", "kind": "intraday", "fn": q_orb_v2, "daily": True,
+     "bracket": b_orb_v2,
      "registered": "2026-11-20", "family": "quant"},
     {"id": "orb-active", "name": "Opening-range breakout, active days", "kind": "intraday", "fn": q_orb_active,
+     "bracket": b_orb_active,
      "daily": True, "registered": "2026-11-20", "family": "quant"},
     {"id": "intraday-momentum", "name": "Intraday momentum (Gao et al.)", "kind": "intraday",
      "fn": q_intraday_momentum, "daily": True, "registered": "2026-11-20", "family": "quant"},
@@ -693,7 +726,9 @@ def partial_day(rows1, now):
     key = D.day_key(now.astimezone(D.NY))
     a = np.full((D.SLOTS, 4), np.nan)
     for t, o, h, lo, c in rows1:
-        if t.minute == 0 and t.hour != 17 and D.day_key(t) == key and t + dt.timedelta(hours=1) <= now.astimezone(D.NY):
+        # Yahoo's futures bars run about 10 minutes behind: a bar counts once 12 minutes have passed since its end
+        if t.minute == 0 and t.hour != 17 and D.day_key(t) == key and \
+                t + dt.timedelta(hours=1, minutes=12) <= now.astimezone(D.NY):
             a[(t.hour - 18) % 24] = (o, h, lo, c)
     done = 0
     while done < D.SLOTS and not np.isnan(a[done, 0]):
@@ -721,9 +756,22 @@ def live_intraday(st, rows1, s_today, w, now, ctx_today=None):
     if plan and plan[0] <= done and not (len(plan) > 5 and plan[0] >= done):
         k, d, stop, target, end = plan[:5]
         entry = plan[5] if len(plan) > 5 else (O[k] if k < done else C[done - 1])
-        return {"state": "signal", "dir": "LONG" if d > 0 else "SHORT", "entry": round(float(entry), 2),
+        return {"state": "signal", "day": str(key), "dir": "LONG" if d > 0 else "SHORT", "entry": round(float(entry), 2),
                 "stop": round(float(stop), 2), "target": round(float(target), 2) if target is not None else None,
                 "at": "%02d:00" % D.SLOT_HOURS[k], "exitBy": "%02d:00 New York" % ((D.SLOT_HOURS[end] + 1) % 24)}
+    if st.get("bracket") and done >= slot(10):
+        with np.errstate(invalid="ignore", divide="ignore"):
+            try:
+                b = st["bracket"](fill, s_today, w, ctx_today)
+            except (ValueError, ZeroDivisionError):
+                b = None
+        if b and done <= b["lastEntrySlot"]:
+            b = {k: v for k, v in b.items() if k != "lastEntrySlot"}
+            return {"state": "orders", "day": str(key), **b,
+                    "note": "Place both stop orders now (one cancels the other); cancel if unfilled by %s New York."
+                            % b["cancelAt"]}
+        if b is None and st["id"] == "orb-active":
+            return {"state": "none", "day": str(key), "note": "Not an active day: no trade today."}
     if done > last:
         return {"state": "none", "note": "No signal today."}
     return {"state": "waiting", "note": "Decides by %02d:00 New York." % D.SLOT_HOURS[last]}

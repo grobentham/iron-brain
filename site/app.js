@@ -242,9 +242,9 @@
   var rz; window.addEventListener("resize", function () { clearTimeout(rz); rz = setTimeout(chrome_, 150); });
   function sigLine() {
     var Lb = D.lab; if (!Lb) return "";
-    var on = Lb.strategies.filter(function (x) { return x.tier === "tested" && x.market === cur && x.live && x.live.state === "signal"; });
+    var on = Lb.strategies.filter(function (x) { return x.tier === "tested" && x.market === cur && x.live && (x.live.state === "signal" || x.live.state === "orders"); });
     var tested = Lb.strategies.filter(function (x) { return x.tier === "tested"; });
-    if (on.length) return '<p class="sigline on"><b>Tested signal:</b> ' + on.map(function (x) { return esc(x.name) + " " + esc(x.live.dir); }).join(", ") + '. <a href="#signals">Details</a></p>';
+    if (on.length) return '<p class="sigline on"><b>Tested signal:</b> ' + on.map(function (x) { var l = x.live; return esc(x.name) + (l.state === "orders" ? ": buy stop " + fmt(l.buyStop, D.markets[cur]) + " / sell stop " + fmt(l.sellStop, D.markets[cur]) + " until " + esc(l.cancelAt) : " " + esc(l.dir)); }).join("; ") + '. <a href="#signals">Details</a></p>';
     return '<p class="sigline">' + (tested.length ? "No tested signal right now for " + esc(D.markets[cur].name) + "." : "No strategy your account allows has passed testing yet, so there are no signals.") + ' <a href="#signals">Signals</a></p>';
   }
 
@@ -339,8 +339,13 @@
     var stopPts = on && lv.stop && lv.entry ? Math.abs(lv.entry - lv.stop) : x.avgDailyMove;
     var nf = stopPts ? Math.floor(risk / (stopPts * v.pv)) : 0, nm = stopPts ? Math.floor(risk / (stopPts * v.micro)) : 0;
     var pos = on ? '<span class="sig ' + (lv.dir === "LONG" ? "long" : "short") + '">' + esc(lv.dir) + "</span>" : '<span class="sig">' + esc(lv.dir === "FLAT" ? "FLAT" : "NO SIGNAL") + "</span>";
-    var plan = on && lv.entry ? "Entry " + fmt(lv.entry, v) + " at " + esc(lv.at) + " · stop " + fmt(lv.stop, v) + (lv.target ? " · target " + fmt(lv.target, v) : "") + " · out by " + esc(lv.exitBy) : esc(lv.note || "");
-    var size = stopPts ? "At $" + Math.round(risk).toLocaleString("en-US") + " risk " + (on && lv.stop ? "to the stop (" + pts(stopPts, v) + " pts)" : "and a stop one average daily move away (" + pts(Math.round(stopPts / v.tick) * v.tick, v) + " pts; the rule itself has no stop)") + (nm ? ": <b>" + nf + "</b> full or <b>" + nm + "</b> micro." : ": too small for one contract. One micro risks " + usd(stopPts * v.micro) + " here.") : "";
+    var orders = lv.state === "orders";
+    if (orders) pos = '<span class="sig orders">PLACE ORDERS</span>';
+    var plan = orders ? '<table class="t brk"><tbody><tr><td>Buy stop</td><td class="n"><b>' + fmt(lv.buyStop, v) + '</b></td><td>protective stop</td><td class="n">' + fmt(lv.stopLong, v) + '</td></tr><tr><td>Sell stop</td><td class="n"><b>' + fmt(lv.sellStop, v) + '</b></td><td>protective stop</td><td class="n">' + fmt(lv.stopShort, v) + "</td></tr></tbody></table>One cancels the other. Cancel if unfilled by <b>" + esc(lv.cancelAt) + "</b> New York; flat by " + esc(lv.exitBy) + "."
+      : on && lv.entry ? "Entry " + fmt(lv.entry, v) + " at " + esc(lv.at) + " · stop " + fmt(lv.stop, v) + (lv.target ? " · target " + fmt(lv.target, v) : "") + " · out by " + esc(lv.exitBy) : esc(lv.note || "");
+    if (orders) { stopPts = Math.abs(lv.buyStop - lv.stopLong); nf = Math.floor(risk / (stopPts * v.pv)); nm = Math.floor(risk / (stopPts * v.micro)); }
+    var hasStop = (on && lv.stop) || orders;
+    var size = stopPts ? "At $" + Math.round(risk).toLocaleString("en-US") + " risk " + (hasStop ? "to the protective stop (" + pts(stopPts, v) + " pts)" : "and a stop one average daily move away (" + pts(Math.round(stopPts / v.tick) * v.tick, v) + " pts)") + (nm ? ": <b>" + nf + "</b> full or <b>" + nm + "</b> micro." : ": too small for one contract. One micro risks " + usd(stopPts * v.micro) + " here.") : "";
     return '<div class="scard ' + x.tier + '"><div class="sc-top"><span class="tierb ' + x.tier + '">' + (x.tier === "tested" ? "TESTED" : x.tier === "research" ? "NOT ALLOWED" : "CANDIDATE") + '</span><b>' + esc(v.name) + " · " + esc(x.name) + "</b>" + pos + "</div>" +
       '<p class="sc-rule">' + esc(x.rule) + "</p><p>" + plan + "</p>" + (lv.next ? "<p><b>Next:</b> " + esc(lv.next) + "</p>" : "") + (size ? '<p class="sc-size">' + size + "</p>" : "") +
       '<p class="fine">Backtest ' + esc(x.from.slice(0, 4)) + "–" + esc(x.to.slice(0, 4)) + ": " + usd(x.perYearUsd) + "/yr per contract, max drawdown " + usd(-x.maxDdUsd) + " · Sharpe " + x.sharpe.toFixed(2) + " · t " + x.t.toFixed(2) + (x.tier === "candidate" ? " (needs " + D.lab.bar.toFixed(2) + ")" : "") + " · beat " + pc(x.beatRandom) + " of random runs · forward record: " + x.forward.trades + " trade" + (x.forward.trades === 1 ? "" : "s") + (x.forward.trades ? ", " + usd(x.forward.usd) : "") + " since " + esc(x.forward.since) + ".</p></div>";
