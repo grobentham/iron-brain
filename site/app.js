@@ -2,7 +2,7 @@
    out here from the current price and New York time. */
 (function () {
   "use strict";
-  var D = null, B = null, Q = null, cur = "nq", live = {}, manual = {};
+  var D = null, B = null, Q = null, MU = null, cur = "nq", live = {}, manual = {};
   var QUOTES = "https://raw.githubusercontent.com/grobentham/iron-brain/quotes/quotes.json";
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
@@ -372,7 +372,7 @@
     $("lab-body").innerHTML = head +
       '<div class="card"><h3>' + esc(v.name) + ' strategies</h3><div class="hscroll"><table class="t lab"><thead><tr><th>Strategy</th><th class="n">Trades</th><th class="n">Win</th><th class="n">Per year</th><th class="n">Max DD</th><th class="n">t</th><th class="n">vs random</th><th class="n">Sharpe (95% range)</th><th>Verdict</th><th>50K Builder eval<br><small>at $500 risk</small></th><th>Today</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
       '<p class="fine">Dollars are per full contract (one ' + esc(v.name) + " point is $" + v.pv + ") after costs. “vs random” is the share of 200 random-timing runs of the same rule that it beat. Sharpe is annualised, with the range the result is consistent with. <b>Inconclusive</b> means the data can’t rule a worthwhile edge (Sharpe ≥ " + Lb.meaningful + ") in or out; <b>no edge</b> means it can. <b>Promising</b> holds up on every check and is significant on its own, but not after allowing for " + Lb.trials + " tests. Click a row for details.</p></div>" +
-      ensembleView(Lb, v) +
+      ensembleView(Lb, v) + mutationView(v) +
       (Lb.changes ? '<details class="paper"><summary>Method changes (' + Lb.changes.length + ")</summary><ul>" + Lb.changes.map(function (c) { return "<li><b>" + esc(c[0]) + "</b> " + esc(c[1]) + "</li>"; }).join("") + "</ul><p class=\"fine\">The rules themselves are never edited. Changes to how they’re tested were made after seeing results, so the forward record, which no change can touch, is the cleaner test.</p></details>" : "");
     Array.prototype.forEach.call($("lab-body").querySelectorAll("tr.srow"), function (tr) {
       tr.onclick = function () { var k = tr.getAttribute("data-k"); open_ = open_ === k ? "" : k; store.set("ib-lab-open", open_); labView(); };
@@ -393,6 +393,18 @@
     var lo = -1.5, hi = 2.5, sc = function (y) { return Math.max(0, Math.min(100, (y - lo) / (hi - lo) * 100)); };
     var a = sc(x.sharpeRange[0]), b = sc(x.sharpeRange[1]);
     return '<span class="ci' + (x.sharpeRange[0] > 0 ? " good" : "") + '" title="Annual Sharpe and its 95% range; the line is zero"><span class="z" style="left:' + sc(0) + '%"></span><span class="rg" style="left:' + a + "%;width:" + Math.max(2, b - a) + '%"></span><span class="pt" style="left:' + sc(x.sharpe) + '%"></span></span>';
+  }
+  function mutationView(v) {
+    var M = MU && MU.markets && MU.markets[cur];
+    if (!M) return "";
+    var res = function (r) { return r.better ? '<span class="pass">Better than base</span>' : r.passed ? '<span class="mid">Passed, not better</span>' : '<span class="fail">Failed</span>'; };
+    var rows = M.top.map(function (r) {
+      return "<tr><td>" + esc(r.rule) + '</td><td class="n">' + r.discovery.sharpe.toFixed(2) + '</td><td class="n">' + r.plateau.toFixed(2) + '</td><td class="n"><b>' + r.holdout.sharpe.toFixed(2) + '</b></td><td class="n">' + r.tVsBase.toFixed(2) + "</td><td>" + res(r) + "</td></tr>";
+    }).join("");
+    return '<div class="card"><h3>Mutation search: variations on the opening-range breakout</h3>' +
+      '<p class="sub">' + M.variants + " variants of the breakout (range length, last entry, stop, target, exit time, filters, long-only) were run on the older data only (" + esc(M.discovery[0].slice(0, 4)) + "–" + esc(M.discovery[1].slice(0, 4)) + "). The five with the broadest good neighbourhoods were then tested once on " + esc(M.holdout[0].slice(0, 4)) + "–" + esc(M.holdout[1].slice(0, 4)) + ", which the search never saw. The base breakout made a Sharpe of <b>" + M.base.holdout.sharpe.toFixed(2) + "</b> on that period.</p>" +
+      '<div class="hscroll"><table class="t"><thead><tr><th>Variant</th><th class="n">Search Sharpe</th><th class="n">Neighbours</th><th class="n">Unseen data</th><th class="n">vs base (t)</th><th>Result</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+      '<p class="fine">“Neighbours” is the median Sharpe of the variants one setting away; a high number means the result isn’t a lucky spike. A variant counts as better only if it beats the base breakout on the unseen data with t ≥ 1.65 and passes t ≥ ' + MU.holdoutBar.toFixed(2) + " on its own. Stops tighter than the range were dropped from the search: hourly bars overstated them by about 75% against 5-minute data. The winner is registered as opening-range breakout v2.</p></div>";
   }
   function ensembleView(Lb, v) {
     var e = (Lb.ensembles || []).filter(function (x) { return x.market === cur; })[0];
@@ -494,6 +506,7 @@
   }
   load().then(function () {
     route(); tabs(); acctView(); signalsView(); desk(true); labView(); testsView(); ctx(); chrome_();
+    fetch("research/mutations.json?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (m) { MU = m; labView(); }).catch(function () {});
     fetch("/displace/data/bias/current.json?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (b) { B = b; ctx(); }).catch(function () { ctx(); });
     setInterval(function () { desk(false); chrome_(); }, 15000);
     loadQuotes(); setInterval(loadQuotes, 60000);
