@@ -25,6 +25,8 @@ def test_no_look_ahead():
     days, s, _ = _days()
     w = L.profiles(days)
     ctx = L.intraday_context(days, s, w, [None] * len(days))
+    for c in ctx:
+        c["market"] = "nq"
     rnd = random.Random(2)
     checked = 0
     for i in range(60, len(days)):

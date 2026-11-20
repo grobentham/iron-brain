@@ -112,6 +112,18 @@ result (NQ Sharpe 1.0, gold 0.8, and in the 50K Builder simulation it passes abo
 quarter to a third for luck) but is inconclusive; the model and mean reversion show nothing. The long history should
 settle it.
 
+### Mutation search (`engine/mutate.py`)
+
+Variations on the opening-range breakout are searched with a discovery / holdout split: every variant (range length,
+last entry, stop at the middle or far side of the range, target, exit time, filters, long-only) is run on older data
+only (NQ to 2022, gold to 2019); the five with the broadest good neighbourhoods (median Sharpe of the variants one
+setting away) go once to the later data; a variant counts only if it passes there and beats the base breakout.
+Tighter stops were tried first and looked best, but against 5-minute bars hourly bars overstated them by about 75%,
+so they're left out until minute data is available. The result is opening-range breakout v2 (entries until 11:00,
+stop at the far side of the range, flat at 16:00): NQ Sharpe 1.98 over 2018–2026 and 2.26 on the unseen 2023–2026
+data against 1.77 for the base, and in the 50K Builder simulation it fails 32% of evaluations against 47%. The
+report is published at `site/research/mutations.json` and on the Strategies tab.
+
 ## Signals and alerts
 
 The Signals panel at the top of the page has three tiers. **Tested** strategies passed every check and are the only
