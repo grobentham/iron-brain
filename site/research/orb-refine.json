@@ -1,0 +1,342 @@
+{
+ "variants": 144,
+ "holdoutBar": 2.33,
+ "finalists": [
+  {
+   "settings": {
+    "stop": "mid",
+    "until": 16,
+    "exit": 16,
+    "filter": "none",
+    "be": false
+   },
+   "base": true,
+   "discovery": {
+    "sharpe": 1.175,
+    "t": 2.53,
+    "trades": 1142,
+    "bpPerDay": 5.327,
+    "halves": [
+     891.9,
+     5340.8
+    ]
+   },
+   "plateau": 1.12,
+   "holdout": {
+    "sharpe": 0.911,
+    "t": 1.76,
+    "trades": 936,
+    "bpPerDay": 3.326,
+    "halves": [
+     3417.4,
+     -280.7
+    ]
+   },
+   "passedHoldout": false,
+   "tradesPerYear": 247.8,
+   "corrDrive": 0.25,
+   "prop": {
+    "alone2023": {
+     "pass": 0.438,
+     "fail": 0.562,
+     "medianDays": 87
+    },
+    "withDrive2023": {
+     "pass": 0.523,
+     "fail": 0.477,
+     "medianDays": 53
+    },
+    "aloneAll": {
+     "pass": 0.572,
+     "fail": 0.428,
+     "medianDays": 123
+    },
+    "withDriveAll": {
+     "pass": 0.641,
+     "fail": 0.359,
+     "medianDays": 72
+    }
+   }
+  },
+  {
+   "settings": {
+    "stop": "mid",
+    "until": 14,
+    "exit": 16,
+    "filter": "not-wide",
+    "be": true
+   },
+   "base": false,
+   "discovery": {
+    "sharpe": 1.458,
+    "t": 3.14,
+    "trades": 1062,
+    "bpPerDay": 5.887,
+    "halves": [
+     1962.4,
+     4924.8
+    ]
+   },
+   "plateau": 1.37,
+   "holdout": {
+    "sharpe": 1.245,
+    "t": 2.41,
+    "trades": 880,
+    "bpPerDay": 4.043,
+    "halves": [
+     3118.6,
+     693.5
+    ]
+   },
+   "passedHoldout": true,
+   "tradesPerYear": 231.6,
+   "corrDrive": 0.24,
+   "prop": {
+    "alone2023": {
+     "pass": 0.594,
+     "fail": 0.406,
+     "medianDays": 107
+    },
+    "withDrive2023": {
+     "pass": 0.631,
+     "fail": 0.369,
+     "medianDays": 60
+    },
+    "aloneAll": {
+     "pass": 0.724,
+     "fail": 0.276,
+     "medianDays": 142
+    },
+    "withDriveAll": {
+     "pass": 0.738,
+     "fail": 0.262,
+     "medianDays": 79
+    }
+   }
+  },
+  {
+   "settings": {
+    "stop": "mid",
+    "until": 16,
+    "exit": 16,
+    "filter": "not-wide",
+    "be": true
+   },
+   "base": false,
+   "discovery": {
+    "sharpe": 1.505,
+    "t": 3.24,
+    "trades": 1073,
+    "bpPerDay": 6.092,
+    "halves": [
+     2127.1,
+     5000.8
+    ]
+   },
+   "plateau": 1.34,
+   "holdout": {
+    "sharpe": 1.236,
+    "t": 2.39,
+    "trades": 887,
+    "bpPerDay": 4.021,
+    "halves": [
+     3141.6,
+     649.9
+    ]
+   },
+   "passedHoldout": true,
+   "tradesPerYear": 233.8,
+   "corrDrive": 0.24,
+   "prop": {
+    "alone2023": {
+     "pass": 0.587,
+     "fail": 0.413,
+     "medianDays": 108
+    },
+    "withDrive2023": {
+     "pass": 0.63,
+     "fail": 0.37,
+     "medianDays": 61
+    },
+    "aloneAll": {
+     "pass": 0.729,
+     "fail": 0.271,
+     "medianDays": 140
+    },
+    "withDriveAll": {
+     "pass": 0.738,
+     "fail": 0.262,
+     "medianDays": 78
+    }
+   }
+  },
+  {
+   "settings": {
+    "stop": "mid",
+    "until": 16,
+    "exit": 16,
+    "filter": "not-wide",
+    "be": false
+   },
+   "base": false,
+   "discovery": {
+    "sharpe": 1.341,
+    "t": 2.89,
+    "trades": 1073,
+    "bpPerDay": 5.75,
+    "halves": [
+     1488.7,
+     5239.1
+    ]
+   },
+   "plateau": 1.3,
+   "holdout": {
+    "sharpe": 0.914,
+    "t": 1.77,
+    "trades": 887,
+    "bpPerDay": 3.154,
+    "halves": [
+     3219.5,
+     -245.5
+    ]
+   },
+   "passedHoldout": false,
+   "tradesPerYear": 233.8,
+   "corrDrive": 0.24,
+   "prop": {
+    "alone2023": {
+     "pass": 0.46,
+     "fail": 0.54,
+     "medianDays": 96
+    },
+    "withDrive2023": {
+     "pass": 0.548,
+     "fail": 0.452,
+     "medianDays": 56
+    },
+    "aloneAll": {
+     "pass": 0.609,
+     "fail": 0.391,
+     "medianDays": 132
+    },
+    "withDriveAll": {
+     "pass": 0.67,
+     "fail": 0.33,
+     "medianDays": 76
+    }
+   }
+  },
+  {
+   "settings": {
+    "stop": "mid",
+    "until": 14,
+    "exit": 16,
+    "filter": "not-wide",
+    "be": false
+   },
+   "base": false,
+   "discovery": {
+    "sharpe": 1.296,
+    "t": 2.79,
+    "trades": 1062,
+    "bpPerDay": 5.544,
+    "halves": [
+     1324.1,
+     5161.8
+    ]
+   },
+   "plateau": 1.29,
+   "holdout": {
+    "sharpe": 0.922,
+    "t": 1.78,
+    "trades": 880,
+    "bpPerDay": 3.176,
+    "halves": [
+     3196.6,
+     -201.8
+    ]
+   },
+   "passedHoldout": false,
+   "tradesPerYear": 231.6,
+   "corrDrive": 0.24,
+   "prop": {
+    "alone2023": {
+     "pass": 0.462,
+     "fail": 0.538,
+     "medianDays": 96
+    },
+    "withDrive2023": {
+     "pass": 0.552,
+     "fail": 0.448,
+     "medianDays": 57
+    },
+    "aloneAll": {
+     "pass": 0.608,
+     "fail": 0.392,
+     "medianDays": 131
+    },
+    "withDriveAll": {
+     "pass": 0.668,
+     "fail": 0.332,
+     "medianDays": 76
+    }
+   }
+  },
+  {
+   "settings": {
+    "stop": "mid",
+    "until": 12,
+    "exit": 16,
+    "filter": "not-wide",
+    "be": true
+   },
+   "base": false,
+   "discovery": {
+    "sharpe": 1.439,
+    "t": 3.1,
+    "trades": 1037,
+    "bpPerDay": 5.78,
+    "halves": [
+     1991.1,
+     4772.0
+    ]
+   },
+   "plateau": 1.28,
+   "holdout": {
+    "sharpe": 1.326,
+    "t": 2.57,
+    "trades": 866,
+    "bpPerDay": 4.295,
+    "halves": [
+     3204.0,
+     846.6
+    ]
+   },
+   "passedHoldout": true,
+   "tradesPerYear": 227.0,
+   "corrDrive": 0.24,
+   "prop": {
+    "alone2023": {
+     "pass": 0.622,
+     "fail": 0.378,
+     "medianDays": 106
+    },
+    "withDrive2023": {
+     "pass": 0.645,
+     "fail": 0.355,
+     "medianDays": 59
+    },
+    "aloneAll": {
+     "pass": 0.745,
+     "fail": 0.255,
+     "medianDays": 143
+    },
+    "withDriveAll": {
+     "pass": 0.749,
+     "fail": 0.251,
+     "medianDays": 80
+    }
+   }
+  }
+ ]
+}

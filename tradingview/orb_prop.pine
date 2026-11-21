@@ -1,0 +1,204 @@
+//@version=6
+// Iron Brain · Opening-range breakout, prop version (NQ / MNQ). Indicator with alerts. Not advice.
+// Rules, New York time (Singapore +13h in US winter, +12h in US summer):
+//   1. The 09:00-10:00 high and low are the opening range.
+//   2. Skip the day if the range is wide: 0.6x the normal day range or more. The normal day range is an EWMA
+//      (span 20) of the daily high-low range in log terms, the same measure the opening drive uses.
+//   3. From 10:00, a buy stop above the high and a sell stop below the low; one cancels the other. Cancel at 14:00.
+//   4. Stop at the middle of the range.
+//   5. Breakeven: once an hour closes (on the hour) at least half the stop distance in profit, move the stop to entry.
+//   6. No target. Flat at 16:00. One trade a day.
+// Chosen from 144 variants on NQ to 2022 and checked on 2023 onwards (Sharpe 1.25 there against 0.91 for the plain
+// breakout). On 5-minute bars it kept about 72% of the hourly backtest's profit. Expect about 28% winners: many
+// small losses and breakevens, and fewer, larger wins.
+// Use a 1-, 5- or 15-minute chart. The panel counts trades on the bars loaded, before costs.
+indicator("Iron Brain · ORB (prop)", shorttitle = "IB ORB prop", overlay = true, max_labels_count = 500)
+
+// ---------- inputs ----------
+float wideMult  = input.float(0.6, "Skip ranges wider than (x normal day range)", minval = 0.1, step = 0.05)
+int   untilHour = input.int(14, "Cancel unfilled orders at (New York hour)", options = [12, 14, 16])
+int   exitHour  = input.int(16, "Flat at (New York hour)", options = [14, 15, 16])
+bool  useBE     = input.bool(true, "Breakeven after an hour closes half the stop distance in profit")
+int   tickPad   = input.int(1, "Ticks beyond the range for the stop orders", minval = 0)
+float riskUsd   = input.float(300, "Risk per trade ($)", minval = 1, step = 50)
+int   maxQty    = input.int(40, "Max contracts (40 micros or 4 minis)", minval = 1)
+bool  showStats = input.bool(true, "Show panel")
+
+if not timeframe.isintraday or timeframe.in_seconds() > 3600 or 3600 % timeframe.in_seconds() != 0
+    runtime.error("Use a chart that divides the hour: 1, 2, 3, 5, 10, 15, 20, 30 or 60 minutes.")
+
+string TZ   = "America/New_York"
+int    SPAN = 20
+float  A    = 2.0 / (SPAN + 1)
+
+// ---------- New York clock; the trading day starts at 18:00 ----------
+int  openMin  = hour(time, TZ) * 60 + minute(time, TZ)
+int  closeMin = hour(time_close, TZ) * 60 + minute(time_close, TZ)
+int  shifted  = time + 6 * 3600000
+int  tdKey    = year(shifted, TZ) * 10000 + month(shifted, TZ) * 100 + dayofmonth(shifted, TZ)
+bool newDay   = tdKey != nz(tdKey[1])
+
+// ---------- normal day range: EWMA of the daily log range ----------
+var float dHi = na
+var float dLo = na
+var float s   = na
+var array<float> first = array.new<float>()
+if newDay and not na(dHi) and dLo > 0
+    float R = math.log(dHi / dLo)
+    if na(s)
+        array.push(first, R * R)
+        if array.size(first) == SPAN
+            s := math.sqrt(array.avg(first))
+    else
+        s := math.sqrt(A * R * R + (1 - A) * s * s)
+if newDay
+    dHi := high
+    dLo := low
+else
+    dHi := math.max(dHi, high)
+    dLo := math.min(dLo, low)
+
+// ---------- today's state ----------
+var float sDay   = na
+var float orHi   = na
+var float orLo   = na
+var bool  ready  = false
+var bool  skip   = false
+var int   dir    = 0
+var float entry  = na
+var float stop   = na
+var float dist   = na
+var int   qty    = 0
+var bool  live   = false
+var bool  done   = false
+var string status = "Waiting for 09:00"
+var int   nTr    = 0
+var int   nWin   = 0
+var float sumPts = 0.0
+var float sumR   = 0.0
+
+if newDay
+    sDay   := s
+    orHi   := na
+    orLo   := na
+    ready  := false
+    skip   := false
+    dir    := 0
+    entry  := na
+    stop   := na
+    dist   := na
+    qty    := 0
+    live   := false
+    done   := false
+    status := "Waiting for 09:00"
+
+if openMin >= 9 * 60 and openMin < 10 * 60
+    orHi := na(orHi) ? high : math.max(orHi, high)
+    orLo := na(orLo) ? low : math.min(orLo, low)
+    status := "Measuring the 09:00-10:00 range"
+
+float pad      = tickPad * syminfo.mintick
+float buyStop  = orHi + pad
+float sellStop = orLo - pad
+float mid      = (orHi + orLo) / 2
+
+// the range is final at the close of the bar that ends at 10:00
+if closeMin == 10 * 60 and not na(orHi) and orHi > orLo and not na(sDay)
+    ready := true
+    skip  := math.log(orHi / orLo) >= wideMult * sDay
+    float d0 = buyStop - mid
+    qty   := int(math.min(maxQty, math.floor(riskUsd / (d0 * syminfo.pointvalue))))
+    if skip
+        status := "No trade: the range is wide (" + str.tostring(orHi - orLo, format.mintick) + " pts)"
+        alert(syminfo.ticker + " ORB (prop): range too wide today, no trade", alert.freq_once_per_bar_close)
+    else
+        status := "Orders working until " + str.tostring(untilHour) + ":00"
+        alert(syminfo.ticker + " ORB (prop): buy stop " + str.tostring(buyStop, format.mintick) + ", sell stop " +
+             str.tostring(sellStop, format.mintick) + ", stop at the middle " + str.tostring(mid, format.mintick) + ", " +
+             str.tostring(qty) + " contracts at $" + str.tostring(riskUsd) + " risk; cancel " + str.tostring(untilHour) +
+             ":00, flat " + str.tostring(exitHour) + ":00 NY", alert.freq_once_per_bar_close)
+
+// ---------- fills (bars after 10:00) ----------
+float result = na
+bool  filledNow = false
+if ready and not skip and not done and not live and openMin >= 10 * 60 and openMin < untilHour * 60 and openMin < exitHour * 60
+    bool up = high >= buyStop
+    bool dn = low <= sellStop
+    if up and dn
+        // both sides in one bar: the first fills (a bar that opened nearer its high went up first) and is stopped
+        bool upFirst = (high - open) <= (open - low)
+        dir    := upFirst ? 1 : -1
+        entry  := upFirst ? math.max(buyStop, open) : math.min(sellStop, open)
+        result := dir * (mid - entry)
+        status := "Both sides hit in one bar: stopped " + str.tostring(result, format.mintick) + " pts"
+    else if up or dn
+        dir   := up ? 1 : -1
+        entry := up ? math.max(buyStop, open) : math.min(sellStop, open)
+        stop  := mid
+        dist  := math.abs(entry - stop)
+        live  := true
+        filledNow := true
+        status := (dir > 0 ? "LONG" : "SHORT") + " from " + str.tostring(entry, format.mintick)
+        label.new(bar_index, dir > 0 ? low : high, (dir > 0 ? "ORB LONG" : "ORB SHORT") + "\nStop " + str.tostring(stop, format.mintick) +
+             "\n" + str.tostring(qty) + " contracts", style = dir > 0 ? label.style_label_up : label.style_label_down,
+             color = dir > 0 ? color.new(#1e8a5a, 0) : color.new(#c23b3b, 0), textcolor = color.white, size = size.small)
+        alert(syminfo.ticker + " ORB (prop) " + (dir > 0 ? "LONG" : "SHORT") + " filled at about " + str.tostring(entry, format.mintick) +
+             ", stop " + str.tostring(stop, format.mintick), alert.freq_once_per_bar_close)
+        // the same bar may also reach the stop after the fill, or close beyond it
+        bool upF = (high - open) <= (open - low)
+        bool hit = dir > 0 ? ((upF and low <= stop) or close <= stop) : ((not upF and high >= stop) or close >= stop)
+        if hit
+            result := dir * (stop - entry)
+            status := "Stopped: " + str.tostring(result, format.mintick) + " pts"
+if ready and not skip and not done and not live and na(result) and openMin >= untilHour * 60 and openMin < 18 * 60
+    done   := true
+    status := "No breakout before " + str.tostring(untilHour) + ":00"
+
+// ---------- manage the open trade ----------
+if live and not filledNow and na(result)
+    bool stopped = dir > 0 ? low <= stop : high >= stop
+    if stopped
+        result := dir > 0 ? math.min(stop, open) - entry : entry - math.max(stop, open)
+        status := (stop == entry ? "Breakeven exit: " : "Stopped: ") + str.tostring(result, format.mintick) + " pts"
+    else if closeMin >= exitHour * 60 or openMin >= exitHour * 60
+        result := dir * (close - entry)
+        status := "Closed at " + str.tostring(exitHour) + ":00: " + (result >= 0 ? "+" : "") + str.tostring(result, format.mintick) + " pts"
+if live and na(result) and useBE and closeMin % 60 == 0 and dir * (close - entry) >= 0.5 * dist
+    stop := dir > 0 ? math.max(stop, entry) : math.min(stop, entry)
+
+if not na(result)
+    live := false
+    done := true
+    nTr  += 1
+    nWin += result > 0 ? 1 : 0
+    sumPts += result
+    float dd = math.abs(entry - mid)
+    sumR   += dd > 0 ? result / dd : 0
+    label.new(bar_index, dir > 0 ? high : low, (result >= 0 ? "+" : "") + str.tostring(result, format.mintick),
+         style = label.style_label_left, color = color.new(color.gray, 70), textcolor = result >= 0 ? #1e8a5a : #c23b3b, size = size.tiny)
+
+// ---------- drawing ----------
+bool dayShow = not na(orHi) and openMin >= 9 * 60 and openMin < 16 * 60
+plot(dayShow ? orHi : na, "Range high", color = color.new(#1e8a5a, 0), style = plot.style_linebr, linewidth = 2)
+plot(dayShow ? orLo : na, "Range low", color = color.new(#c23b3b, 0), style = plot.style_linebr, linewidth = 2)
+plot(dayShow and ready ? mid : na, "Range middle (stop)", color = color.new(color.gray, 30), style = plot.style_linebr)
+plot(live or not na(result) ? entry : na, "Entry", color = color.new(color.blue, 0), style = plot.style_linebr, linewidth = 2)
+plot(live ? stop : na, "Current stop", color = color.new(#e9a20c, 0), style = plot.style_linebr, linewidth = 2)
+bgcolor(openMin >= 9 * 60 and openMin < 10 * 60 ? color.new(#e9a20c, 88) : na, title = "Opening range 09:00-10:00")
+bgcolor(ready and not skip and not done and not live and openMin >= 10 * 60 and openMin < untilHour * 60 ? color.new(#2446c9, 93) : na, title = "Orders working")
+
+// ---------- panel ----------
+var table tbl = table.new(position.top_right, 2, 6, bgcolor = color.new(color.white, 10), border_width = 1, border_color = color.new(color.gray, 70))
+if showStats and barstate.islast
+    table.cell(tbl, 0, 0, "IB ORB (prop)", text_color = color.black, text_size = size.small)
+    table.cell(tbl, 1, 0, status, text_color = color.black, text_size = size.small)
+    table.cell(tbl, 0, 1, "Buy / sell stop", text_size = size.small)
+    table.cell(tbl, 1, 1, ready ? str.tostring(buyStop, format.mintick) + " / " + str.tostring(sellStop, format.mintick) : "-", text_size = size.small)
+    table.cell(tbl, 0, 2, "Stop (middle)", text_size = size.small)
+    table.cell(tbl, 1, 2, ready ? str.tostring(mid, format.mintick) + " · " + str.tostring(buyStop - mid, format.mintick) + " pts" : "-", text_size = size.small)
+    table.cell(tbl, 0, 3, "Size at $" + str.tostring(riskUsd), text_size = size.small)
+    table.cell(tbl, 1, 3, ready ? str.tostring(qty) + " contracts" + (live and stop == entry ? " · at breakeven" : "") : "-", text_size = size.small)
+    table.cell(tbl, 0, 4, "Trades on chart", text_size = size.small)
+    table.cell(tbl, 1, 4, str.tostring(nTr) + (nTr > 0 ? " · " + str.tostring(100.0 * nWin / nTr, "#") + "% wins" : ""), text_size = size.small)
+    table.cell(tbl, 0, 5, "Total, before costs", text_size = size.small)
+    table.cell(tbl, 1, 5, str.tostring(sumPts, format.mintick) + " pts · " + str.tostring(sumR, "#.#") + " R", text_size = size.small)
