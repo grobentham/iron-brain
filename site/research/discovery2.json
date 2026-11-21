@@ -1,0 +1,397 @@
+{
+ "generated": "2026-11-21T03:34+00:00",
+ "tests": 22,
+ "advanced": 2,
+ "holdoutBar": 1.96,
+ "results": [
+  {
+   "market": "nq",
+   "id": "drive-10",
+   "rule": "Hour drive 10:00: when the 10:00-11:00 hour moves at least 0.2x the typical day range, trade its direction from 11:00 on days the 09:00 hour did not already qualify as an opening drive; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": -0.41,
+    "t": -0.88,
+    "trades": 256,
+    "bpPerDay": -0.982,
+    "halves": [
+     -1740.2,
+     591.4
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "two-hour-drive",
+   "rule": "Two-hour drive: on days without a 09:00 opening drive, a 09:00-11:00 move of at least 0.35x the typical day range sets the direction from 11:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": -0.511,
+    "t": -1.1,
+    "trades": 129,
+    "bpPerDay": -0.849,
+    "halves": [
+     -830.7,
+     -162.8
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "drive-08",
+   "rule": "Hour drive 08:00: when the 08:00-09:00 hour moves at least 0.2x the typical day range, trade its direction from 09:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": -0.104,
+    "t": -0.22,
+    "trades": 104,
+    "bpPerDay": -0.264,
+    "halves": [
+     -41.6,
+     -267.6
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "drive-03",
+   "rule": "Hour drive 03:00: when the 03:00-04:00 hour moves at least 0.15x the typical day range, trade its direction from 04:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": 0.151,
+    "t": 0.33,
+    "trades": 164,
+    "bpPerDay": 0.453,
+    "halves": [
+     -335.3,
+     864.8
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "drive-13",
+   "rule": "Hour drive 13:00: when the 13:00-14:00 hour moves at least 0.15x the typical day range, trade its direction from 14:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": -0.104,
+    "t": -0.22,
+    "trades": 257,
+    "bpPerDay": -0.19,
+    "halves": [
+     -926.2,
+     704.0
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "overnight-range-breakout",
+   "rule": "Overnight range breakout: stop orders at the 18:00-09:00 high and low, accepted 09:00-14:00 (whichever trades first); stop at the 09:00 open; flat 16:00.",
+   "discovery": {
+    "sharpe": 1.966,
+    "t": 4.24,
+    "trades": 1080,
+    "bpPerDay": 8.995,
+    "halves": [
+     3648.0,
+     6875.8
+    ]
+   },
+   "advanced": true,
+   "holdout": {
+    "sharpe": 1.952,
+    "t": 3.78,
+    "trades": 894,
+    "bpPerDay": 8.361,
+    "halves": [
+     3224.5,
+     4660.0
+    ]
+   },
+   "beatRandom": 1.0,
+   "passed": true,
+   "corrPlan": 0.71,
+   "planPass": {
+    "before": [
+     0.735,
+     0.227,
+     94
+    ],
+    "after": [
+     0.695,
+     0.305,
+     41
+    ]
+   }
+  },
+  {
+   "market": "nq",
+   "id": "overnight-cont-0.25",
+   "rule": "Overnight continuation: when 09:00 opens at least 0.25x the typical day range away from the prior 16:00 close, trade in that direction at 09:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": -0.009,
+    "t": -0.02,
+    "trades": 510,
+    "bpPerDay": -0.04,
+    "halves": [
+     -7.2,
+     -39.6
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "overnight-cont-0.5",
+   "rule": "Overnight continuation: when 09:00 opens at least 0.5x the typical day range away from the prior 16:00 close, trade in that direction at 09:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": 0.166,
+    "t": 0.36,
+    "trades": 161,
+    "bpPerDay": 0.452,
+    "halves": [
+     -726.5,
+     1255.6
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "close-loc-momentum",
+   "rule": "Prior-day close location (momentum): when the prior day's 16:00 close was in the top or bottom fifth of its full range, trade in the same direction at 09:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": -0.503,
+    "t": -1.08,
+    "trades": 599,
+    "bpPerDay": -2.344,
+    "halves": [
+     -2659.1,
+     -83.9
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "close-loc-reversal",
+   "rule": "Prior-day close location (reversal): when the prior day's 16:00 close was in the top or bottom fifth of its full range, trade against it at 09:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": 0.828,
+    "t": 1.78,
+    "trades": 599,
+    "bpPerDay": 4.376,
+    "halves": [
+     1375.4,
+     3744.7
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "nq",
+   "id": "inside-hour",
+   "rule": "Inside-hour breakout: when the 10:00-11:00 hour stays inside the 09:00-10:00 range, stop orders beyond that range from 11:00 to 14:00; stop at the far side; flat 16:00.",
+   "discovery": {
+    "sharpe": -0.647,
+    "t": -1.39,
+    "trades": 82,
+    "bpPerDay": -0.705,
+    "halves": [
+     -746.7,
+     -78.2
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "drive-10",
+   "rule": "Hour drive 10:00: when the 10:00-11:00 hour moves at least 0.2x the typical day range, trade its direction from 11:00 on days the 09:00 hour did not already qualify as an opening drive; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": 0.221,
+    "t": 0.7,
+    "trades": 431,
+    "bpPerDay": 0.28,
+    "halves": [
+     424.1,
+     273.9
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "two-hour-drive",
+   "rule": "Two-hour drive: on days without a 09:00 opening drive, a 09:00-11:00 move of at least 0.35x the typical day range sets the direction from 11:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": 0.486,
+    "t": 1.53,
+    "trades": 209,
+    "bpPerDay": 0.455,
+    "halves": [
+     1246.1,
+     -112.6
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "drive-08",
+   "rule": "Hour drive 08:00: when the 08:00-09:00 hour moves at least 0.2x the typical day range, trade its direction from 09:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": 0.011,
+    "t": 0.04,
+    "trades": 652,
+    "bpPerDay": 0.02,
+    "halves": [
+     212.3,
+     -162.0
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "drive-03",
+   "rule": "Hour drive 03:00: when the 03:00-04:00 hour moves at least 0.15x the typical day range, trade its direction from 04:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": 0.191,
+    "t": 0.6,
+    "trades": 441,
+    "bpPerDay": 0.433,
+    "halves": [
+     1367.4,
+     -288.6
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "drive-13",
+   "rule": "Hour drive 13:00: when the 13:00-14:00 hour moves at least 0.15x the typical day range, trade its direction from 14:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": -0.253,
+    "t": -0.79,
+    "trades": 373,
+    "bpPerDay": -0.201,
+    "halves": [
+     -66.8,
+     -433.3
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "overnight-range-breakout",
+   "rule": "Overnight range breakout: stop orders at the 18:00-09:00 high and low, accepted 09:00-14:00 (whichever trades first); stop at the 09:00 open; flat 16:00.",
+   "discovery": {
+    "sharpe": 0.76,
+    "t": 2.39,
+    "trades": 1899,
+    "bpPerDay": 1.929,
+    "halves": [
+     3312.2,
+     1495.6
+    ]
+   },
+   "advanced": true,
+   "holdout": {
+    "sharpe": 1.374,
+    "t": 3.57,
+    "trades": 1334,
+    "bpPerDay": 3.695,
+    "halves": [
+     4115.6,
+     2169.5
+    ]
+   },
+   "beatRandom": 1.0,
+   "passed": true
+  },
+  {
+   "market": "gold",
+   "id": "overnight-cont-0.25",
+   "rule": "Overnight continuation: when 09:00 opens at least 0.25x the typical day range away from the prior 16:00 close, trade in that direction at 09:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": 0.186,
+    "t": 0.58,
+    "trades": 1206,
+    "bpPerDay": 0.478,
+    "halves": [
+     1461.9,
+     -270.3
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "overnight-cont-0.5",
+   "rule": "Overnight continuation: when 09:00 opens at least 0.5x the typical day range away from the prior 16:00 close, trade in that direction at 09:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": 0.36,
+    "t": 1.13,
+    "trades": 507,
+    "bpPerDay": 0.622,
+    "halves": [
+     1111.8,
+     438.6
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "close-loc-momentum",
+   "rule": "Prior-day close location (momentum): when the prior day's 16:00 close was in the top or bottom fifth of its full range, trade in the same direction at 09:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": -0.178,
+    "t": -0.56,
+    "trades": 963,
+    "bpPerDay": -0.427,
+    "halves": [
+     -804.0,
+     -259.5
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "close-loc-reversal",
+   "rule": "Prior-day close location (reversal): when the prior day's 16:00 close was in the top or bottom fifth of its full range, trade against it at 09:00; stop half the remaining range away; flat 16:00.",
+   "discovery": {
+    "sharpe": -0.036,
+    "t": -0.11,
+    "trades": 963,
+    "bpPerDay": -0.083,
+    "halves": [
+     810.0,
+     -1016.5
+    ]
+   },
+   "advanced": false
+  },
+  {
+   "market": "gold",
+   "id": "inside-hour",
+   "rule": "Inside-hour breakout: when the 10:00-11:00 hour stays inside the 09:00-10:00 range, stop orders beyond that range from 11:00 to 14:00; stop at the far side; flat 16:00.",
+   "discovery": {
+    "sharpe": 0.134,
+    "t": 0.42,
+    "trades": 299,
+    "bpPerDay": 0.109,
+    "halves": [
+     172.7,
+     99.5
+    ]
+   },
+   "advanced": false
+  }
+ ]
+}
