@@ -1,0 +1,234 @@
+{
+ "variants": 360,
+ "holdoutBar": 2.33,
+ "finalists": [
+  {
+   "settings": {
+    "th": 0.25,
+    "stop": 0.5,
+    "exit": 16,
+    "filter": "none",
+    "be": false
+   },
+   "discovery": {
+    "sharpe": 1.633,
+    "t": 3.52,
+    "trades": 271,
+    "bpPerDay": 5.061,
+    "halves": [
+     2821.9,
+     3099.3
+    ]
+   },
+   "plateau": 1.53,
+   "holdout": {
+    "sharpe": 1.019,
+    "t": 1.97,
+    "trades": 238,
+    "bpPerDay": 3.314,
+    "halves": [
+     1050.3,
+     2074.6
+    ]
+   },
+   "passedHoldout": false,
+   "tradesPerYear": 60.7,
+   "prop1MNQ": {
+    "pass": 0.873,
+    "fail": 0.126,
+    "medianDays": 204
+   },
+   "base": true
+  },
+  {
+   "settings": {
+    "th": 0.25,
+    "stop": 0.5,
+    "exit": 15,
+    "filter": "not-stretched",
+    "be": true
+   },
+   "discovery": {
+    "sharpe": 1.818,
+    "t": 3.92,
+    "trades": 253,
+    "bpPerDay": 4.836,
+    "halves": [
+     2685.3,
+     2972.2
+    ]
+   },
+   "plateau": 1.74,
+   "holdout": {
+    "sharpe": 1.1,
+    "t": 2.13,
+    "trades": 220,
+    "bpPerDay": 2.931,
+    "halves": [
+     1095.0,
+     1669.0
+    ]
+   },
+   "passedHoldout": false,
+   "tradesPerYear": 56.4,
+   "prop1MNQ": {
+    "pass": 0.918,
+    "fail": 0.081,
+    "medianDays": 226
+   },
+   "base": false
+  },
+  {
+   "settings": {
+    "th": 0.25,
+    "stop": 0.35,
+    "exit": 15,
+    "filter": "not-stretched",
+    "be": true
+   },
+   "discovery": {
+    "sharpe": 1.735,
+    "t": 3.74,
+    "trades": 253,
+    "bpPerDay": 4.292,
+    "halves": [
+     2414.8,
+     2606.4
+    ]
+   },
+   "plateau": 1.72,
+   "holdout": {
+    "sharpe": 0.79,
+    "t": 1.53,
+    "trades": 220,
+    "bpPerDay": 1.545,
+    "halves": [
+     1194.3,
+     263.1
+    ]
+   },
+   "passedHoldout": false,
+   "tradesPerYear": 56.4,
+   "prop1MNQ": {
+    "pass": 0.868,
+    "fail": 0.116,
+    "medianDays": 296
+   },
+   "base": false
+  },
+  {
+   "settings": {
+    "th": 0.25,
+    "stop": 0.5,
+    "exit": 14,
+    "filter": "not-stretched",
+    "be": true
+   },
+   "discovery": {
+    "sharpe": 1.796,
+    "t": 3.87,
+    "trades": 253,
+    "bpPerDay": 4.437,
+    "halves": [
+     2630.1,
+     2561.6
+    ]
+   },
+   "plateau": 1.72,
+   "holdout": {
+    "sharpe": 1.018,
+    "t": 1.97,
+    "trades": 220,
+    "bpPerDay": 2.662,
+    "halves": [
+     1043.7,
+     1466.7
+    ]
+   },
+   "passedHoldout": false,
+   "tradesPerYear": 56.4,
+   "prop1MNQ": {
+    "pass": 0.92,
+    "fail": 0.075,
+    "medianDays": 259
+   },
+   "base": false
+  },
+  {
+   "settings": {
+    "th": 0.25,
+    "stop": 0.5,
+    "exit": 16,
+    "filter": "not-stretched",
+    "be": true
+   },
+   "discovery": {
+    "sharpe": 1.841,
+    "t": 3.97,
+    "trades": 253,
+    "bpPerDay": 5.477,
+    "halves": [
+     3142.0,
+     3266.7
+    ]
+   },
+   "plateau": 1.71,
+   "holdout": {
+    "sharpe": 1.014,
+    "t": 1.96,
+    "trades": 220,
+    "bpPerDay": 3.136,
+    "halves": [
+     829.1,
+     2128.4
+    ]
+   },
+   "passedHoldout": false,
+   "tradesPerYear": 56.4,
+   "prop1MNQ": {
+    "pass": 0.917,
+    "fail": 0.082,
+    "medianDays": 214
+   },
+   "base": false
+  },
+  {
+   "settings": {
+    "th": 0.25,
+    "stop": 0.35,
+    "exit": 16,
+    "filter": "not-stretched",
+    "be": true
+   },
+   "discovery": {
+    "sharpe": 1.742,
+    "t": 3.75,
+    "trades": 253,
+    "bpPerDay": 4.782,
+    "halves": [
+     2730.7,
+     2863.9
+    ]
+   },
+   "plateau": 1.65,
+   "holdout": {
+    "sharpe": 0.695,
+    "t": 1.35,
+    "trades": 220,
+    "bpPerDay": 1.365,
+    "halves": [
+     987.9,
+     299.0
+    ]
+   },
+   "passedHoldout": false,
+   "tradesPerYear": 56.4,
+   "prop1MNQ": {
+    "pass": 0.86,
+    "fail": 0.128,
+    "medianDays": 286
+   },
+   "base": false
+  }
+ ]
+}
