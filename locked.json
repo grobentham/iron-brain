@@ -14,7 +14,17 @@
     "state": "none"
    },
    "nq:orb-0930": {
+    "dataNotes": [
+     "09:30 high 27,137.00 looks like a bad print (bar 26,878.50-26,859.25); treated as 26,932.75"
+    ],
     "lockedAt": "2026-11-23 09:52",
+    "mismatches": [
+     {
+      "at": "2026-11-23 11:25",
+      "entry": 26933.0,
+      "state": "signal"
+     }
+    ],
     "name": "ORB 09:30 (15-min range)",
     "signal": {
      "buyStop": 27137.25,
