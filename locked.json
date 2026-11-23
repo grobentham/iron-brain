@@ -1,6 +1,18 @@
 {
  "days": {
   "2026-11-23": {
+   "nq:drive-v2": {
+    "lockedAt": "2026-11-23 10:12",
+    "plan": null,
+    "signal": {
+     "borderline": false,
+     "day": "2026-11-23",
+     "note": "No trade today: the 09:00 hour moved too little.",
+     "ratio": 0.075,
+     "state": "none"
+    },
+    "state": "none"
+   },
    "nq:orb-0930": {
     "lockedAt": "2026-11-23 09:52",
     "name": "ORB 09:30 (15-min range)",
@@ -19,6 +31,16 @@
      "targetShort": 25426.75
     },
     "state": "orders"
+   },
+   "nq:orb-prop": {
+    "lockedAt": "2026-11-23 10:12",
+    "plan": null,
+    "signal": {
+     "day": "2026-11-23",
+     "note": "Opening range too wide (0.6x the day range or more): no trade today.",
+     "state": "none"
+    },
+    "state": "none"
    }
   }
  }
