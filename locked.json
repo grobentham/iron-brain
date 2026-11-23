@@ -15,6 +15,7 @@
    },
    "nq:orb-0930": {
     "dataNotes": [
+     "09:30 high 27,137.00 is a one-minute spike (bar 26,878.50-26,859.25): a bad print or a news jolt that reversed at once; treated as 26,920.50",
      "09:30 high 27,137.00 is a one-minute spike (bar 26,878.50-26,859.25): a bad print or a news jolt that reversed at once; treated as 26,921.25",
      "09:30 high 27,137.00 is a one-minute spike (bar 26,878.50-26,859.25): a bad print or a news jolt that reversed at once; treated as 26,922.25",
      "09:30 high 27,137.00 is a one-minute spike (bar 26,878.50-26,859.25): a bad print or a news jolt that reversed at once; treated as 26,922.50",
@@ -127,6 +128,11 @@
      },
      {
       "at": "2026-11-23 13:06",
+      "entry": 26921.5,
+      "state": "signal"
+     },
+     {
+      "at": "2026-11-23 13:11",
       "entry": 26921.5,
       "state": "signal"
      }
