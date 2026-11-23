@@ -1,3 +1,25 @@
 {
- "days": {}
+ "days": {
+  "2026-11-23": {
+   "nq:orb-0930": {
+    "lockedAt": "2026-11-23 09:52",
+    "name": "ORB 09:30 (15-min range)",
+    "signal": {
+     "buyStop": 27137.25,
+     "cancelAt": "14:00",
+     "day": "2026-11-23",
+     "exitBy": "15:55",
+     "rangeHigh": 27137.0,
+     "rangeLow": 26450.25,
+     "sellStop": 26450.0,
+     "state": "orders",
+     "stopLong": 27032.27,
+     "stopShort": 26552.33,
+     "targetLong": 28187.09,
+     "targetShort": 25426.75
+    },
+    "state": "orders"
+   }
+  }
+ }
 }
