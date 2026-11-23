@@ -64,6 +64,11 @@
       "at": "2026-11-23 12:02",
       "entry": 26928.0,
       "state": "signal"
+     },
+     {
+      "at": "2026-11-23 12:09",
+      "entry": 26928.0,
+      "state": "signal"
      }
     ],
     "name": "ORB 09:30 (15-min range)",
