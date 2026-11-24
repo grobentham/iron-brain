@@ -2,17 +2,20 @@
  "2026-11-23": {
   "high": [],
   "top": [
-   "U.S. stock futures steady after Nvidia-led Wall Street rally",
-   "The Nasdaq Just Had Its Best Day Since April 2025. Anthropic Stock Fell Anyway.",
-   "A Memo To Cummins' Power Systems Team About Delayed Shipments",
-   "Nvidia\u2019s stock was falling. Here's why one investor is buying more",
-   "What Just Happened To Lam Research Stock Since May?"
+   "South Korea's opposition calls for probe after KOSPI plunge",
+   "Nvidia reinstates Jensen Huang after Trump speaks \u2018directly\u2019 to board",
+   "US Stock Selloff Revives Question of a Fed \u2018Put,\u2019 This Time Under Warsh",
+   "Markets soar as Huang returns as Nvidia CEO",
+   "Why Is AMD Stock Up Today? Shares Jump 6.85% as Nvidia Brings Back Jensen Huang as CEO"
   ],
   "topics": {
+   "Data": 5,
    "Earnings": 2,
-   "Index": 9,
-   "Megacaps": 3,
-   "Nvidia": 4
+   "Fed & rates": 14,
+   "Geopolitics": 2,
+   "Index": 50,
+   "Megacaps": 12,
+   "Nvidia": 50
   }
  }
 }
