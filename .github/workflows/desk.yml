@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # the locked-signals record on the signals branch
+  contents: write   # the Pages deploy; the locked signals live in the private engine repo
   pages: write
   id-token: write
   issues: write
@@ -74,9 +74,9 @@ jobs:
         run: |
           git fetch -q --depth 1 pub +refs/heads/history-data:refs/remotes/origin/history-data \
             && git worktree add -q --detach engine/cache/duka origin/history-data || echo "no long history yet"
-      - name: Locked signals (the signals branch)
+      - name: Locked signals (the private engine repo's signals branch: full trade mechanics stay private)
         run: |
-          if git fetch -q --depth 1 pub +refs/heads/signals:refs/remotes/origin/signals; then
+          if git fetch -q --depth 1 origin +refs/heads/signals:refs/remotes/origin/signals; then
             git worktree add -q -B signals engine/cache/signals origin/signals
           else
             git worktree add -q --orphan -b signals engine/cache/signals
@@ -95,7 +95,7 @@ jobs:
           cd engine/cache/signals
           git add -A
           git -c user.name=iron-brain -c user.email=iron-brain@users.noreply.github.com commit -q -m "Signals as of $(TZ=America/New_York date '+%Y-%m-%d %H:%M') New York" || { echo "no new locks"; exit 0; }
-          url="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          url="https://x-access-token:${{ secrets.ENGINE_TOKEN }}@github.com/grobentham/iron-brain-engine.git"
           for i in 1 2 3 4 5; do
             git push -q "$url" signals && break
             sleep 5
