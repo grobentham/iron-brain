@@ -502,6 +502,35 @@
     },
     "state": "none"
    }
+  },
+  "2026-11-24": {
+   "nq:orb-0930": {
+    "lockedAt": "2026-11-24 09:56",
+    "name": "ORB 09:30 (15-min range)",
+    "signal": {
+     "at": "09:45",
+     "atMinute": 45,
+     "beEvery": "15-minute close",
+     "breakevenAt": 26527.65,
+     "buyStop": 26417.5,
+     "cancelAt": "14:00",
+     "day": "2026-11-24",
+     "dir": "LONG",
+     "entry": 26417.5,
+     "exitBy": "15:55",
+     "rangeHigh": 26417.25,
+     "rangeLow": 26192.0,
+     "sellStop": 26191.75,
+     "state": "signal",
+     "stop": 26307.35,
+     "stopLong": 26307.35,
+     "stopShort": 26300.96,
+     "target": 27519.0,
+     "targetLong": 27519.03,
+     "targetShort": 25099.63
+    },
+    "state": "signal"
+   }
   }
  }
 }
