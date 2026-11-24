@@ -111,6 +111,8 @@ jobs:
           sed -i "s|href=\"styles.css\"|href=\"styles.css?v=$v\"|; s|src=\"app.js\"|src=\"app.js?v=$v\"|" site/index.html
           grep -o 'app.js?v=[a-f0-9]*' site/index.html
       - uses: actions/configure-pages@v5
+      - name: Keep strategy rules off the public site
+        run: python engine/public.py site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
