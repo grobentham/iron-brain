@@ -20,19 +20,20 @@
  "2026-11-24": {
   "high": [],
   "top": [
-   "Apple Inc. $AAPL Stock Position Cut by Cidel Asset Management Inc.",
-   "Apple Inc. $AAPL Stake Lifted by Columbia Bank",
-   "CRWV, NBIS And IREN Rally In A \u2018Good Day\u2019 For Neoclouds \u2014 Databricks Co-Founder Flags Security Gaps At \u2018Top\u2019 Neoclouds",
-   "Tesla, Inc. $TSLA Shares Sold by AlphaGrep UK Ltd",
-   "Aviance Capital Partners LLC Sells 3,433 Shares of Apple Inc. $AAPL"
+   "Nvidia suppliers, startups in Asia cheer Huang's return as uncertainty eases",
+   "European shares pause after month-best rally on Nvidia euphoria",
+   "Tech firms soar as Huang's return reinvigorates AI trade",
+   "US Dollar Hits 20-Month High Before Wednesday's Big Inflation Test",
+   "Tesla Stock Is on Track for Only Its 3rd Losing Year Since Its 2010 IPO. Here's What Happened After the Other 2."
   ],
   "topics": {
-   "Data": 3,
-   "Fed & rates": 12,
-   "Geopolitics": 2,
-   "Index": 39,
+   "Data": 5,
+   "Earnings": 1,
+   "Fed & rates": 11,
+   "Geopolitics": 3,
+   "Index": 44,
    "Megacaps": 25,
-   "Nvidia": 41
+   "Nvidia": 39
   }
  }
 }
