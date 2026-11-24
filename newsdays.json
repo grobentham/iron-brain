@@ -20,19 +20,20 @@
  "2026-11-24": {
   "high": [],
   "top": [
-   "Nvidia Bulls Rule on Asian Stock Markets",
-   "Why 1 Billionaire Investor Just Poured $3 Billion Into Amazon, Meta, and Alphabet",
-   "Nvidia Turmoil: How Big Is the Risk for CoreWeave?",
-   "Nvidia Lost $2.75 Trillion in 45 Days -- More Than the Market Cap of 496 S&P 500 Companies -- and Investors Wagering on a Quick Bounce to New Highs May Be Disappointed",
-   "Market's Fear Gauge Rises"
+   "47 ETFs Add to Tesla (TSLA) Holdings on Nov. 20",
+   "Alphabet (GOOG) Sees $310.5 Million in Net ETF Buying on Nov. 20",
+   "Jensen Huang is back at Nvidia, but his startling return causes more scrutiny",
+   "Amazon (AMZN) Sees $473.6 Million in Net ETF Buying on Friday",
+   "61 ETFs Add to Microsoft (MSFT) Holdings on Nov. 20"
   ],
   "topics": {
-   "Earnings": 1,
-   "Fed & rates": 1,
+   "Data": 1,
+   "Earnings": 4,
+   "Fed & rates": 12,
    "Geopolitics": 1,
-   "Index": 10,
-   "Megacaps": 4,
-   "Nvidia": 8
+   "Index": 46,
+   "Megacaps": 18,
+   "Nvidia": 35
   }
  }
 }
