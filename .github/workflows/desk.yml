@@ -74,7 +74,7 @@ jobs:
         run: |
           git fetch -q --depth 1 pub +refs/heads/history-data:refs/remotes/origin/history-data \
             && git worktree add -q --detach engine/cache/duka origin/history-data || echo "no long history yet"
-      - name: Locked signals (the private engine repo's signals branch: full trade mechanics stay private)
+      - name: Locked signals (signals branch of the private engine repo, so trade mechanics stay private)
         run: |
           if git fetch -q --depth 1 origin +refs/heads/signals:refs/remotes/origin/signals; then
             git worktree add -q -B signals engine/cache/signals origin/signals
