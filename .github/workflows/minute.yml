@@ -1,0 +1,79 @@
+name: Minute
+# Builds the 2018-on Dukascopy minute history (New York session only) on the minute-data branch. One job per year
+# runs in parallel (about 45 minutes each, resuming where the last run stopped; their files never overlap); the last
+# job starts the next run while anything is missing. Runs hourly as a backup, and monthly once complete.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: minute
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 58
+    strategy:
+      fail-fast: false
+      matrix:
+        year: [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: grobentham/iron-brain-engine
+          token: ${{ secrets.ENGINE_TOKEN }}
+          persist-credentials: false
+      - name: Connect the private engine and the public data branches
+        run: |
+          git remote set-url origin "https://x-access-token:${{ secrets.ENGINE_TOKEN }}@github.com/grobentham/iron-brain-engine.git"
+          git remote add pub "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q numpy
+      - name: Check out the minute-data branch
+        run: |
+          if git ls-remote --exit-code --heads pub minute-data >/dev/null; then
+            git fetch -q --depth 1 pub +refs/heads/minute-data:refs/remotes/origin/minute-data
+            git worktree add -q -B minute-data engine/cache/minute origin/minute-data
+          else
+            git worktree add -q --detach engine/cache/minute
+            (cd engine/cache/minute && git checkout -q --orphan minute-data && git rm -rfq . && git clean -fdq)
+          fi
+      - name: Fetch missing months of ${{ matrix.year }}
+        run: cd engine && python3 minute.py nq ${{ matrix.year }} | tee /tmp/minute.log
+      - name: Save to minute-data
+        if: always()
+        run: |
+          cd engine/cache/minute
+          [ -f vercel.json ] || printf '{"git":{"deploymentEnabled":false}}\n' > vercel.json   # Vercel is not used
+          git add -A
+          git -c user.name=iron-brain -c user.email=iron-brain@users.noreply.github.com commit -q -m "Dukascopy minute history ${{ matrix.year }}" || { echo "nothing new"; exit 0; }
+          url="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          # parallel jobs push to the same branch: their files never overlap, so rebase onto whoever saved first
+          for i in $(seq 1 12); do
+            git push -q "$url" minute-data && break
+            git fetch -q --depth 200 "$url" minute-data:refs/remotes/origin/minute-data
+            git -c user.name=iron-brain -c user.email=iron-brain@users.noreply.github.com rebase -q -X theirs origin/minute-data || { git rebase --abort; sleep 5; continue; }
+            sleep $(( RANDOM % 10 + 3 ))
+          done
+  next:
+    needs: build
+    if: always()
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    steps:
+      - name: Start the next run while months are missing (GitHub's hourly schedule does not fire reliably here)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          have=$(gh api "repos/${{ github.repository }}/git/trees/minute-data" --jq '[.tree[].path | select(test("^nq_[0-9]{4}-[0-9]{2}\\.npz$"))] | length')
+          want=$(python3 -c "import datetime as d; t=d.date.today(); print((t.year-2018)*12 + t.month-1)")
+          echo "minute months: $have of $want"
+          if [ "${have:-0}" -lt "$want" ]; then
+            sleep 30
+            gh api -X POST "repos/${{ github.repository }}/actions/workflows/minute.yml/dispatches" -f ref=main && echo "next run started"
+          fi

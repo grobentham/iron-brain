@@ -1,0 +1,48 @@
+name: History
+# Builds the static 2010-2024 Dukascopy hourly history on the history-data branch. Run by hand; re-run until it
+# reports nothing missing. The desk workflow only reads this branch.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 * * * *"   # hourly until complete; exits in seconds once nothing is missing
+permissions:
+  contents: write
+
+concurrency:
+  group: history
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: grobentham/iron-brain-engine
+          token: ${{ secrets.ENGINE_TOKEN }}
+          persist-credentials: false
+      - name: Connect the private engine and the public data branches
+        run: |
+          git remote set-url origin "https://x-access-token:${{ secrets.ENGINE_TOKEN }}@github.com/grobentham/iron-brain-engine.git"
+          git remote add pub "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+      - name: Check out the history-data branch
+        run: |
+          git fetch -q --depth 1 pub +refs/heads/history-data:refs/remotes/origin/history-data
+          git worktree add -q -B history-data engine/cache/duka origin/history-data
+      - name: Fetch missing months
+        run: python3 engine/history.py
+      - name: Save to history-data
+        if: always()
+        run: |
+          cd engine/cache/duka
+          [ -f vercel.json ] || printf '{"git":{"deploymentEnabled":false}}\n' > vercel.json   # Vercel is not used; stop its auto-deploys
+          git add -A
+          git -c user.name=iron-brain -c user.email=iron-brain@users.noreply.github.com commit -q -m "Dukascopy hourly history" || echo "nothing new"
+          # another run may have saved first: its files never overlap with these, so rebase onto it and retry
+          url="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          for i in 1 2 3 4 5; do
+            git push -q "$url" history-data && break
+            git fetch -q --depth 50 "$url" history-data:refs/remotes/origin/history-data
+            git -c user.name=iron-brain -c user.email=iron-brain@users.noreply.github.com rebase -q origin/history-data || { git rebase --abort; exit 1; }
+            sleep 3
+          done

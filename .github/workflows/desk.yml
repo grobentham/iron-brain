@@ -1,0 +1,132 @@
+name: Iron Brain desk
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # every 15 minutes while futures trade (Sunday evening to Friday evening, UTC)
+    - cron: "*/15 * * * 0-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the locked-signals record on the signals branch
+  pages: write
+  id-token: write
+  issues: write
+
+concurrency:
+  group: desk-${{ github.ref }}
+  # never cancel a publishing run halfway: it may be locking a signal
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: grobentham/iron-brain-engine
+          token: ${{ secrets.ENGINE_TOKEN }}
+          persist-credentials: false
+      - name: Connect the private engine and the public data branches
+        run: |
+          git remote set-url origin "https://x-access-token:${{ secrets.ENGINE_TOKEN }}@github.com/grobentham/iron-brain-engine.git"
+          git remote add pub "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet "numpy>=2,<3"
+      - name: Engine tests
+        run: |
+          python engine/test_desk.py
+          python engine/test_lab.py
+          python engine/test_account.py
+      - name: Page and extension syntax
+        run: |
+          node --check site/app.js
+          node --check live-bridge/service-worker.js
+          node --check live-bridge/page-bridge.js
+          node -e "JSON.parse(require('fs').readFileSync('live-bridge/manifest.json','utf8'))"
+
+  publish:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: grobentham/iron-brain-engine
+          token: ${{ secrets.ENGINE_TOKEN }}
+          persist-credentials: false
+      - name: Connect the private engine and the public data branches
+        run: |
+          git remote set-url origin "https://x-access-token:${{ secrets.ENGINE_TOKEN }}@github.com/grobentham/iron-brain-engine.git"
+          git remote add pub "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet "numpy>=2,<3"
+      - name: Long history (static, from the history-data branch)
+        run: |
+          git fetch -q --depth 1 pub +refs/heads/history-data:refs/remotes/origin/history-data \
+            && git worktree add -q --detach engine/cache/duka origin/history-data || echo "no long history yet"
+      - name: Locked signals (the signals branch)
+        run: |
+          if git fetch -q --depth 1 pub +refs/heads/signals:refs/remotes/origin/signals; then
+            git worktree add -q -B signals engine/cache/signals origin/signals
+          else
+            git worktree add -q --orphan -b signals engine/cache/signals
+          fi
+          [ -f engine/cache/signals/vercel.json ] || printf '{"git":{"deploymentEnabled":false}}\n' > engine/cache/signals/vercel.json
+      - name: Run the desk engine
+        run: python engine/desk.py
+      - name: Market news (headlines and the week's US releases)
+        run: python engine/news.py || echo "news unavailable this run"
+      - name: Phone notifications (ntfy)
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python engine/notify.py
+      - name: Save locked signals
+        run: |
+          cd engine/cache/signals
+          git add -A
+          git -c user.name=iron-brain -c user.email=iron-brain@users.noreply.github.com commit -q -m "Signals as of $(TZ=America/New_York date '+%Y-%m-%d %H:%M') New York" || { echo "no new locks"; exit 0; }
+          url="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          for i in 1 2 3 4 5; do
+            git push -q "$url" signals && break
+            sleep 5
+          done
+      - name: Alert on new signals
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python engine/alerts.py
+      - name: Stamp asset links with this build, so browsers fetch the new code at once
+        run: |
+          v=${GITHUB_SHA::8}
+          sed -i "s|href=\"styles.css\"|href=\"styles.css?v=$v\"|; s|src=\"app.js\"|src=\"app.js?v=$v\"|" site/index.html
+          grep -o 'app.js?v=[a-f0-9]*' site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      # GitHub's Pages API sometimes fails to find a just-uploaded artifact ("Fetching artifact metadata failed"):
+      # wait and try again twice before giving up
+      - if: steps.deploy.outcome == 'failure'
+        run: sleep 45
+      - id: deploy2
+        if: steps.deploy.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - if: steps.deploy.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: sleep 90
+      - id: deploy3
+        if: steps.deploy.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        uses: actions/deploy-pages@v4

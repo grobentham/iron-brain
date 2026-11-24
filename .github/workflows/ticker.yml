@@ -1,0 +1,120 @@
+name: Ticker
+
+# Keeps the desk current while futures trade:
+#   - about once a minute, publishes the latest NQ and gold prices to the `quotes` branch (quotes.json),
+#     which the page polls every minute;
+#   - every 5 minutes from 10:00 to 16:15 New York (every 15 otherwise), starts the desk workflow (GitHub's own cron can be late or never fire).
+# Restarts itself before the 6-hour job limit; a cron every 6 hours revives the chain if it stops.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7 */6 * * *"
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: ticker
+  cancel-in-progress: true
+
+jobs:
+  tick:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: grobentham/iron-brain-engine
+          token: ${{ secrets.ENGINE_TOKEN }}
+          persist-credentials: false
+      - name: Connect the private engine and the public data branches
+        run: |
+          git remote set-url origin "https://x-access-token:${{ secrets.ENGINE_TOKEN }}@github.com/grobentham/iron-brain-engine.git"
+          git remote add pub "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet "numpy>=2,<3"
+      - name: Prices every minute, the desk every 15 minutes, for about 5 hours
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          mkdir -p /tmp/q && cd /tmp/q && git init -q -b quotes
+          git config user.name iron-brain && git config user.email iron-brain@users.noreply.github.com
+          cd "$GITHUB_WORKSPACE"
+          end=$(( $(date +%s) + 5*3600 )); last_desk=0; last_hist=0; orb_day=
+          while [ "$(date +%s)" -lt "$end" ]; do
+            dow=$(date -u +%u); hour=$(date -u +%H); open=1
+            # futures trade from Sunday 22:00/23:00 UTC to Friday 21:00/22:00 UTC
+            if [ "$dow" = "6" ]; then open=0; fi
+            if [ "$dow" = "7" ] && [ "$hour" -lt 22 ]; then open=0; fi
+            if [ "$dow" = "5" ] && [ "$hour" -ge 22 ]; then open=0; fi
+            if [ "$open" = "1" ]; then
+              # headlines every minute too (two light requests), shipped inside the prices file: one fetch for the page
+              (cd engine && python news.py --fast /tmp/news.json >/dev/null 2>&1) || echo "news refresh failed"
+              # the NQ market outlook every 5 minutes
+              if [ $(( $(date +%s) - ${last_outlook:-0} )) -ge 300 ]; then
+                last_outlook=$(date +%s)
+                (cd engine && python outlook.py /tmp/outlook.json /tmp/news.json >/dev/null 2>&1) || echo "outlook failed"
+              fi
+              if (cd engine && python quotes.py /tmp/q/quotes.json); then
+                python3 -c "import json,os; q=json.load(open('/tmp/q/quotes.json')); q['news']=json.load(open('/tmp/news.json')) if os.path.exists('/tmp/news.json') else None; q['outlook']=json.load(open('/tmp/outlook.json')) if os.path.exists('/tmp/outlook.json') else None; json.dump(q,open('/tmp/q/quotes.json','w'))" || true
+                (cd /tmp/q && printf '{"git":{"deploymentEnabled":false}}\n' > vercel.json && git add quotes.json vercel.json && git commit -q --amend --allow-empty -m "Latest prices" 2>/dev/null || git commit -q -m "Latest prices"
+                 git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" quotes) || echo "quote push failed"
+              fi
+              now=$(date +%s)
+              if [ $(( now - last_hist )) -ge 3600 ]; then
+                # keep the long-history download going (GitHub's hourly cron for it doesn't fire); it exits at once when complete
+                gh workflow run history.yml -R "$REPO" --ref main >/dev/null 2>&1 && echo "$(date -u +%H:%M) history started"; last_hist=$now
+              fi
+              # the breakout's orders are known once the 09:00-10:00 bar is final (Yahoo runs ~10 min behind)
+              nyhm=$(TZ=America/New_York date +%H%M); nyday=$(TZ=America/New_York date +%F)
+              if [ "$nyhm" -ge 1012 ] && [ "$nyhm" -le 1030 ] && [ "$orb_day" != "$nyday" ]; then
+                gh workflow run desk.yml -R "$REPO" --ref main && echo "$(date -u +%H:%M) desk started for the breakout orders" \
+                  || echo "$(date -u +%H:%M) desk dispatch failed (network?); retrying next loop"
+                orb_day=$nyday; last_desk=$now
+              fi
+              # every 5 minutes while a plan trade can be open (09:45-16:15 New York), else every 15
+              gap=900; if [ "$nyhm" -ge 945 ] && [ "$nyhm" -le 1615 ]; then gap=300; fi
+              if [ $(( now - last_desk )) -ge $gap ]; then
+                since=$(date -u -d "$(( gap / 60 - 2 )) minutes ago" +%Y-%m-%dT%H:%M:%SZ)
+                recent=$(gh run list -R "$REPO" --workflow desk.yml --branch main --limit 5 --json createdAt,event \
+                  --jq "[.[] | select(.createdAt > \"$since\" and .event != \"pull_request\")] | length" 2>/dev/null || echo "0")
+                if [ "$recent" = "0" ]; then
+                  # a GitHub network blip must never end the loop: it would stop the signals until the next restart
+                  gh workflow run desk.yml -R "$REPO" --ref main && echo "$(date -u +%H:%M) desk started" \
+                    || { echo "$(date -u +%H:%M) desk dispatch failed (network?); retrying in a minute"; now=$(( now - gap + 60 )); }
+                fi
+                last_desk=$now
+              fi
+              sleep 55
+            else
+              echo "$(date -u +%H:%M) market closed"
+              # the news keeps coming at weekends: refresh it every 5 minutes into the last prices file
+              if [ $(( $(date +%s) - ${last_wknews:-0} )) -ge 300 ]; then
+                last_wknews=$(date +%s)
+                if (cd engine && python news.py --fast /tmp/news.json >/dev/null 2>&1) && [ -f /tmp/q/quotes.json ]; then
+                  python3 -c "import json; q=json.load(open('/tmp/q/quotes.json')); q['news']=json.load(open('/tmp/news.json')); json.dump(q,open('/tmp/q/quotes.json','w'))" \
+                    && (cd /tmp/q && git add quotes.json && git commit -q --amend -m "Latest prices" && git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" quotes) || echo "weekend news push failed"
+                fi
+              fi
+              # the brain's weekly evolution, on the weekend: start it when the last run is over six days old
+              lastevo=$(gh run list -R "$REPO" --workflow evolve.yml --limit 1 --json createdAt --jq '.[0].createdAt // "2000-01-01T00:00:00Z"' 2>/dev/null || echo "")
+              if [ -n "$lastevo" ] && [ $(( $(date +%s) - $(date -u -d "$lastevo" +%s) )) -ge 518400 ]; then
+                gh workflow run evolve.yml -R "$REPO" --ref main && echo "$(date -u +%H:%M) evolution started" || echo "evolution dispatch failed"
+              fi
+              sleep 900
+            fi
+          done
+      - name: Restart the ticker
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            gh workflow run ticker.yml -R "${{ github.repository }}" --ref main && exit 0
+            echo "restart failed (network?), retrying in 30s"; sleep 30
+          done
+          exit 1

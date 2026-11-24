@@ -1,0 +1,49 @@
+name: Tick probe
+# A quick check that Dukascopy tick files download and decode from GitHub's runners (times and sizes).
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: grobentham/iron-brain-engine
+          token: ${{ secrets.ENGINE_TOKEN }}
+          persist-credentials: false
+      - name: Connect the private engine and the public data branches
+        run: |
+          git remote set-url origin "https://x-access-token:${{ secrets.ENGINE_TOKEN }}@github.com/grobentham/iron-brain-engine.git"
+          git remote add pub "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet "numpy>=2,<3"
+      - run: |
+          cd engine && python - <<'PY'
+          import time, datetime as dt, urllib.request, lzma, gold_ticks as G
+          import collections
+          stats = collections.Counter(); times = []
+          for k in range(40):
+              utc = dt.datetime(2024, 5, 6 + k // 6, 8 + k % 6, tzinfo=dt.timezone.utc)
+              url = G.URL.format(y=utc.year, m=utc.month - 1, d=utc.day, h=utc.hour)
+              t0 = time.time()
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url, headers=G.UA), timeout=60) as r:
+                      raw = r.read()
+                  stats["ok"] += 1
+              except Exception as e:
+                  stats[repr(e)[:60]] += 1
+              times.append(time.time() - t0)
+              time.sleep(0.15)
+          print("RESULT", dict(stats), "median secs", round(sorted(times)[20], 2), "max", round(max(times), 2), "total", round(sum(times), 1))
+          t0 = time.time()
+          x = G.seconds(G.session_ticks(dt.date(2024, 5, 7), "ny"))
+          t1 = time.time()
+          for v in G.versions()[:24]:
+              G.simulate(x, v)
+          print("RESULT session bars", len(x), "fetch", round(t1 - t0, 1), "s; 24 sims", round(time.time() - t1, 1), "s")
+          PY
