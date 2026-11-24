@@ -504,9 +504,25 @@
    }
   },
   "2026-11-24": {
+   "nq:drive-v2": {
+    "lockedAt": "2026-11-24 10:14",
+    "plan": null,
+    "signal": {
+     "borderline": false,
+     "day": "2026-11-24",
+     "note": "No trade today: the 09:00 hour moved too little.",
+     "state": "none"
+    },
+    "state": "none"
+   },
    "nq:orb-0930": {
     "lockedAt": "2026-11-24 09:56",
     "name": "ORB 09:30 (15-min range)",
+    "result": {
+     "exit": 26307.35,
+     "resultPts": -110.15,
+     "stage": "stopped"
+    },
     "signal": {
      "at": "09:45",
      "atMinute": 45,
@@ -530,6 +546,22 @@
      "targetShort": 25099.63
     },
     "state": "signal"
+   },
+   "nq:orb-prop": {
+    "lockedAt": "2026-11-24 10:14",
+    "plan": null,
+    "signal": {
+     "buyStop": 26501.75,
+     "cancelAt": "14:00",
+     "day": "2026-11-24",
+     "exitBy": "16:00",
+     "note": "Place both stop orders now (one cancels the other); cancel if unfilled by 14:00 New York.",
+     "sellStop": 26192.0,
+     "state": "orders",
+     "stopLong": 26346.88,
+     "stopShort": 26346.88
+    },
+    "state": "orders"
    }
   }
  }
