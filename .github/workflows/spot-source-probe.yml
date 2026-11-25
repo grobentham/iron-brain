@@ -1,0 +1,50 @@
+name: Verify XAUUSD data sources
+on:
+  push:
+    branches: [codex/verify-xauusd-sources]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify input shape and timestamps without publishing prices
+        run: |
+          python3 - <<'PY'
+          import concurrent.futures, datetime as dt, json, urllib.parse as up, urllib.request as ur
+          now=int(dt.datetime.now(dt.timezone.utc).timestamp())
+          cb='ironBrainCandles'
+          query=up.urlencode({'path':'chart/json3','time_direction':'N','jsonp':cb,'last_update':(now-8*86400)*1000,
+                              'offer_side':'B','instrument':'XAU/USD','interval':'5MIN','limit':3000})
+          sources={'Dukascopy chart':'https://freeserv.dukascopy.com/2.0/index.php?'+query,
+                   'XAUS samples':'https://xaus.com/api/v1/intraday?symbol=xau&hours=48',
+                   'XAUS chart':'https://xaus.com/api/v1/chart?symbol=xau&range=5d&interval=5m',
+                   'Yahoo spot symbol':'https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD%3DX?range=5d&interval=5m',
+                   'Gold API spot':'https://api.gold-api.com/price/XAU'}
+          def probe(item):
+              name,url=item
+              try:
+                  request=ur.Request(url,headers={'User-Agent':'Mozilla/5.0 (Iron Brain data checks)','Accept':'application/json, text/javascript'})
+                  with ur.urlopen(request,timeout=12) as response:
+                      raw=response.read(3500000).decode().strip()
+                  if raw.startswith(cb+'(') and raw.rstrip(';').endswith(')'):
+                      raw=raw[len(cb)+1:].rstrip(';')[:-1]
+                  data=json.loads(raw)
+                  if isinstance(data,list):
+                      print(name, 'rows=',len(data),'shape=',type(data[-1]).__name__ if data else None,
+                            'first=',data[0][0] if data else None,'last=',data[-1][0] if data else None)
+                      return
+                  chart=(data.get('chart',{}).get('result') or [{}])[0]
+                  points=data.get('points') or data.get('data') or []
+                  latest=points[-1] if isinstance(points,list) and points else {}
+                  print(name,'keys=',list(data),'rows=',len(points) or len(chart.get('timestamp',[])),
+                        'latest=',latest.get('t') if isinstance(latest,dict) else None,
+                        'quoteTime=',data.get('updatedAt') or data.get('data_state',{}).get('as_of'),
+                        'symbol=',chart.get('meta',{}).get('symbol') or data.get('symbol'),
+                        'series=',data.get('source'), 'metadata=',data.get('data_state'))
+              except Exception as error:
+                  print(name,type(error).__name__,str(error))
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+              list(pool.map(probe,sources.items()))
+          PY
