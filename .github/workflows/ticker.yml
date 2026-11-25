@@ -57,7 +57,7 @@ jobs:
             if [ "$open" = "1" ]; then
               # headlines every minute too (two light requests), shipped inside the prices file: one fetch for the page
               (cd engine && python news.py --fast /tmp/news.json >/dev/null 2>&1) || echo "news refresh failed"
-              # refresh the NQ, ES and XAUUSD market outlooks about every 5 minutes
+              # Refresh delayed futures and broker spot-gold outlooks about every 5 minutes.
               if [ $(( $(date +%s) - ${last_outlook:-0} )) -ge 300 ]; then
                 last_outlook=$(date +%s)
                 (cd engine && python outlook.py /tmp/outlook.json /tmp/news.json) || echo "outlook failed"
