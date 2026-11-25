@@ -7,6 +7,9 @@ name: Ticker
 # Restarts itself before the 6-hour job limit; a cron every 6 hours revives the chain if it stops.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/ticker.yml]
   schedule:
     - cron: "7 */6 * * *"
 
@@ -54,10 +57,10 @@ jobs:
             if [ "$open" = "1" ]; then
               # headlines every minute too (two light requests), shipped inside the prices file: one fetch for the page
               (cd engine && python news.py --fast /tmp/news.json >/dev/null 2>&1) || echo "news refresh failed"
-              # the NQ market outlook every 5 minutes
+              # refresh the NQ, ES and XAUUSD market outlooks about every 5 minutes
               if [ $(( $(date +%s) - ${last_outlook:-0} )) -ge 300 ]; then
                 last_outlook=$(date +%s)
-                (cd engine && python outlook.py /tmp/outlook.json /tmp/news.json >/dev/null 2>&1) || echo "outlook failed"
+                (cd engine && python outlook.py /tmp/outlook.json /tmp/news.json) || echo "outlook failed"
               fi
               if (cd engine && python quotes.py /tmp/q/quotes.json); then
                 python3 -c "import json,os; q=json.load(open('/tmp/q/quotes.json')); q['news']=json.load(open('/tmp/news.json')) if os.path.exists('/tmp/news.json') else None; q['outlook']=json.load(open('/tmp/outlook.json')) if os.path.exists('/tmp/outlook.json') else None; json.dump(q,open('/tmp/q/quotes.json','w'))" || true
