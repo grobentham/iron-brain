@@ -18,7 +18,7 @@ jobs:
           with urllib.request.urlopen(request, timeout=10) as response:
               data = json.load(response)
           now = dt.datetime.now(dt.timezone.utc).timestamp()
-          assert data["symbol"] == "xau" and data["currency"] == "USD" and data["unit"] == "oz", print(data.get("symbol"),data.get("currency"),data.get("unit"))
+          assert data["symbol"] == "xau" and data["currency"] == "USD" and data["unit"] == "troy_oz", (data.get("symbol"),data.get("currency"),data.get("unit"))
           points = [(row["t"], row["p"]) for row in data["points"] if row["t"] <= now and math.isfinite(row["p"]) and row["p"] > 0]
           first, last = min(t for t,_ in points), max(t for t,_ in points)
           assert data["data_state"]["status"] == "fresh" and 0 <= now-last <= 900
