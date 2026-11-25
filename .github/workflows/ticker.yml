@@ -47,6 +47,10 @@ jobs:
           mkdir -p /tmp/q && cd /tmp/q && git init -q -b quotes
           git config user.name iron-brain && git config user.email iron-brain@users.noreply.github.com
           cd "$GITHUB_WORKSPACE"
+          # Keep the last verified snapshot if a source is unavailable when the runner restarts.
+          if git fetch -q --depth 1 pub +refs/heads/quotes:refs/remotes/pub/quotes; then
+            git show refs/remotes/pub/quotes:quotes.json | python3 -c 'import json,sys; snapshot=json.load(sys.stdin).get("outlook"); json.dump(snapshot or {},open("/tmp/outlook.json","w"))' || true
+          fi
           end=$(( $(date +%s) + 5*3600 )); last_desk=0; last_hist=0; orb_day=
           while [ "$(date +%s)" -lt "$end" ]; do
             dow=$(date -u +%u); hour=$(date -u +%H); open=1
