@@ -113,6 +113,13 @@ jobs:
       - uses: actions/configure-pages@v5
       - name: Keep strategy rules off the public site
         run: python engine/public.py site
+      - name: Load the public learning summary
+        run: |
+          if git fetch -q --depth 1 origin +refs/heads/learning-memory:refs/remotes/origin/learning-memory; then
+            mkdir -p site/data
+            git show refs/remotes/origin/learning-memory:public.json > "$RUNNER_TEMP/iron-brain-learning.json"
+            mv "$RUNNER_TEMP/iron-brain-learning.json" site/data/learning.json
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
