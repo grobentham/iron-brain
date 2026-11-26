@@ -1,0 +1,62 @@
+name: Iron Brain daily learning
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/learning.yml"]
+  schedule:
+    # 19:20 EDT or 18:20 EST after the New York trading date closes.
+    - cron: "20 23 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iron-brain-daily-learning
+  cancel-in-progress: false
+
+jobs:
+  learn:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: grobentham/iron-brain-engine
+          ref: main
+          token: ${{ secrets.ENGINE_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Review the completed session and save learning memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          memory="$RUNNER_TEMP/iron-brain-learning"
+          ref=refs/heads/learning-memory
+          if git ls-remote --exit-code --heads origin "$ref" >/dev/null; then
+            git fetch -q --depth 1 origin "+$ref:refs/remotes/origin/learning-memory"
+            git worktree add -q --detach "$memory" origin/learning-memory
+          else
+            status=$?
+            if [ "$status" -ne 2 ]; then
+              exit "$status"
+            fi
+            git worktree add -q --orphan -b learning-memory "$memory"
+            printf '{"git":{"deploymentEnabled":false}}\n' > "$memory/vercel.json"
+          fi
+          python engine/learn_portfolio.py \
+            --state "$memory/state.json" \
+            --public "$memory/public.json" \
+            --private-review "$memory/review.json" \
+            --broker "$memory/inputs/reconciliation.json"
+          git -C "$memory" add state.json public.json review.json
+          if [ -f "$memory/vercel.json" ]; then
+            git -C "$memory" add vercel.json
+          fi
+          if ! git -C "$memory" diff --cached --quiet; then
+            git -C "$memory" -c user.name=iron-brain -c user.email=iron-brain@users.noreply.github.com \
+              commit -qm "Save post-session learning evidence"
+            git -C "$memory" push -q origin "HEAD:$ref"
+          fi
