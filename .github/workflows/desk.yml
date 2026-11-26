@@ -42,6 +42,7 @@ jobs:
           python engine/test_desk.py
           python engine/test_lab.py
           python engine/test_account.py
+          python engine/test_learn_portfolio.py
       - name: Page and extension syntax
         run: |
           node --check site/app.js
@@ -118,7 +119,9 @@ jobs:
           if git fetch -q --depth 1 origin +refs/heads/learning-memory:refs/remotes/origin/learning-memory; then
             mkdir -p site/data
             git show refs/remotes/origin/learning-memory:public.json > "$RUNNER_TEMP/iron-brain-learning.json"
-            mv "$RUNNER_TEMP/iron-brain-learning.json" site/data/learning.json
+            if jq -e '(.health.markets | keys) == ["nq"] and all(.subjects[]; .market == "nq")' "$RUNNER_TEMP/iron-brain-learning.json" >/dev/null; then
+              mv "$RUNNER_TEMP/iron-brain-learning.json" site/data/learning.json
+            fi
           fi
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,8 +1,11 @@
 name: History
-# Builds the static 2010-2024 Dukascopy hourly history on the history-data branch. Run by hand; re-run until it
+# Builds the static 2018–2024 NQ hourly history on the history-data branch. Run by hand; re-run until it
 # reports nothing missing. The desk workflow only reads this branch.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/history.yml"]
   schedule:
     - cron: "41 * * * *"   # hourly until complete; exits in seconds once nothing is missing
 permissions:
@@ -36,6 +39,7 @@ jobs:
         run: |
           cd engine/cache/duka
           [ -f vercel.json ] || printf '{"git":{"deploymentEnabled":false}}\n' > vercel.json   # Vercel is not used; stop its auto-deploys
+          git rm --ignore-unmatch -q -- ':(glob)ask/gold_*.json' ':(glob)bid/gold_*.json' ':(glob)ask/xau_*.json' ':(glob)bid/xau_*.json'
           git add -A
           git -c user.name=iron-brain -c user.email=iron-brain@users.noreply.github.com commit -q -m "Dukascopy hourly history" || echo "nothing new"
           # another run may have saved first: its files never overlap with these, so rebase onto it and retry

@@ -1,7 +1,7 @@
 name: Ticker
 
 # Keeps the desk current while futures trade:
-#   - about once a minute, publishes the latest NQ and gold prices to the `quotes` branch (quotes.json),
+#   - about once a minute, publishes the latest NQ prices to the `quotes` branch (quotes.json),
 #     which the page polls every minute;
 #   - every 5 minutes from 10:00 to 16:15 New York (every 15 otherwise), starts the desk workflow (GitHub's own cron can be late or never fire).
 # Restarts itself before the 6-hour job limit; a cron every 6 hours revives the chain if it stops.
@@ -49,7 +49,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           # Keep the last verified snapshot if a source is unavailable when the runner restarts.
           if git fetch -q --depth 1 pub +refs/heads/quotes:refs/remotes/pub/quotes; then
-            git show refs/remotes/pub/quotes:quotes.json | python3 -c 'import json,sys; snapshot=json.load(sys.stdin).get("outlook"); json.dump(snapshot or {},open("/tmp/outlook.json","w"))' || true
+            git show refs/remotes/pub/quotes:quotes.json | PYTHONPATH=engine python3 -c 'import json,sys; from outlook import nq_snapshot; snapshot=json.load(sys.stdin).get("outlook") or {}; json.dump(nq_snapshot(snapshot),open("/tmp/outlook.json","w"))' || true
           fi
           end=$(( $(date +%s) + 5*3600 )); last_desk=0; last_hist=0; orb_day=
           while [ "$(date +%s)" -lt "$end" ]; do
@@ -61,7 +61,7 @@ jobs:
             if [ "$open" = "1" ]; then
               # headlines every minute too (two light requests), shipped inside the prices file: one fetch for the page
               (cd engine && python news.py --fast /tmp/news.json >/dev/null 2>&1) || echo "news refresh failed"
-              # Refresh delayed futures and broker spot-gold outlooks about every 5 minutes.
+              # Refresh the delayed NQ outlook about every 5 minutes.
               if [ $(( $(date +%s) - ${last_outlook:-0} )) -ge 300 ]; then
                 last_outlook=$(date +%s)
                 (cd engine && python outlook.py /tmp/outlook.json /tmp/news.json) || echo "outlook failed"
